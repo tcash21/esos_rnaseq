@@ -48,6 +48,9 @@ prep <- function(d) {
            af = num(GNOMAD_AF), af_popmax = num(GNOMAD_AF_POPMAX),
            is_plp  = grepl("[Pp]athogenic", CLNSIG) & !grepl("Conflicting|Benign", CLNSIG),
            is_conf = grepl("Conflicting", CLNSIG))]
+  if ("CALL_TYPE" %in% names(d))   # Sema4: GT is a bare "1", zygosity lives in INFO/CALL_TYPE
+    d[is.na(zygosity), zygosity := fcase(CALL_TYPE == "het", "het", grepl("^hom", CALL_TYPE), "hom", default = NA_character_)]
+  d[, alt_frac := vapply(strsplit(AD, ","), function(a) { a <- num(a); if (length(a) < 2 || sum(a) == 0) NA_real_ else a[2] / sum(a) }, 0)]
   if (has_ann) {   # SnpEff ANN: Allele|Annotation|Impact|Gene_Name|...  (first entry = most severe)
     a <- tstrsplit(sub(",.*", "", d$ANN), "|", fixed = TRUE)
     d[, `:=`(consequence = a[[2]], impact = a[[3]], ann_gene = a[[4]])]
@@ -84,16 +87,18 @@ setorder(t2, -gene_panel, af_popmax, na.last = FALSE)
 t3 <- panel[is_conf == TRUE]
 
 # ---------- write ----------
-keep <- intersect(c("CHROM","POS","REF","ALT","gene","zygosity","DP","AD","CLNSIG","stars","CLNREVSTAT","CLNDN",
+keep <- intersect(c("CHROM","POS","REF","ALT","gene","zygosity","DP","AD","alt_frac","RED_FLAGS","CLNSIG","stars","CLNREVSTAT","CLNDN",
                     "af","af_popmax","GNOMAD_NHOMALT","consequence","impact","priority","in_panel","FILTER"), names(t1))
 fwrite(t1[, ..keep], file.path(out, "tier1_pathogenic_exomewide.tsv"), sep = "\t")
-keep2 <- intersect(c("CHROM","POS","REF","ALT","gene","zygosity","DP","AD","CLNSIG","stars","af","af_popmax",
+keep2 <- intersect(c("CHROM","POS","REF","ALT","gene","zygosity","DP","AD","alt_frac","RED_FLAGS","CLNSIG","stars","af","af_popmax",
                      "consequence","impact","FILTER"), names(t2))
 fwrite(t2[, ..keep2], file.path(out, "tier2_panel_rare.tsv"), sep = "\t")
 fwrite(t3[, ..keep2], file.path(out, "tier3_panel_conflicting.tsv"), sep = "\t")
 
 fmt_row <- function(d) if (nrow(d) == 0) "_none_" else d[, paste0("- **", gene, "** ", CHROM, ":", POS, " ", REF, ">", ALT,
-  " (", zygosity, ", depth ", DP, ") — ", CLNSIG, " [", stars, "★]",
+  " (", zygosity, ", depth ", DP, sprintf(", alt fraction %.2f", alt_frac),
+  if ("RED_FLAGS" %in% names(d)) ifelse(is.na(RED_FLAGS), "", paste0(", Sema4 flags: ", RED_FLAGS)) else "",
+  ") — ", CLNSIG, " [", stars, "★]",
   ifelse(is.na(af_popmax), " gnomAD: n/a", sprintf(" gnomAD popmax AF %.2e", af_popmax)),
   if ("consequence" %in% names(d)) paste0(" — ", consequence) else "",
   ifelse(!is.na(CLNDN), paste0(" — ", substr(CLNDN, 1, 80)), ""))] |> paste(collapse = "\n")

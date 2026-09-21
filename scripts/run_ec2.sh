@@ -29,6 +29,7 @@ echo ">> step $STEP: ${SH:-} ${RS:-}"
 
 # Remote script (runs as root via SSM; conda envs live under /home/ubuntu)
 read -r -d '' REMOTE <<EOF || true
+#!/bin/bash
 set -euo pipefail
 export PATH=/home/ubuntu/miniforge3/envs/bio/bin:/home/ubuntu/miniforge3/bin:/usr/local/bin:\$PATH
 export HOME=/root TMPDIR=/data/tmp
@@ -38,9 +39,9 @@ aws s3 sync ${BUCKET}/proj/scripts/ scripts/ --only-show-errors
 command -v Rscript >/dev/null || { apt-get update -qq && apt-get install -y -qq r-base-core r-cran-data.table >/dev/null; }
 export PROJ=/data/proj
 LOG=results/logs/step_${STEP}_\$(date +%Y%m%d_%H%M%S).log
+# '&&' chain: set -e is off inside a '||' list, so a failed .sh must explicitly stop the .R
 {
-  $( [[ -n "$SH" ]] && echo "echo '### bash $SH'; bash $SH" )
-  $( [[ -n "$RS" ]] && echo "echo '### Rscript $RS'; Rscript $RS" )
+  true $( [[ -n "$SH" ]] && echo "&& echo '### bash $SH' && bash $SH" ) $( [[ -n "$RS" ]] && echo "&& echo '### Rscript $RS' && Rscript $RS" )
 } 2>&1 | tee "\$LOG" || RC=\$?
 aws s3 sync results/ ${BUCKET}/proj/results/ --only-show-errors
 echo "REMOTE DONE rc=\${RC:-0}"; exit \${RC:-0}

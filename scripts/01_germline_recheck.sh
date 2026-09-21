@@ -50,6 +50,9 @@ log "bcftools $(bcftools --version | head -1 | awk '{print $2}')"
 GVCF="${GVCF:-$(find -L "$DATA" -name '*.germline.vcf' ! -name '*mask_mark*' | head -1)}"
 [[ -f "$GVCF" ]] || { log "ERROR: no *.germline.vcf under $DATA"; exit 1; }
 log "germline VCF: $GVCF"
+# Sema4 puts free-text "## ..." comment lines in the header; bcftools rejects them. Keep only ##key=value.
+awk '!/^##/ || /^##[^ =]+=/' "$GVCF" > "$OUT/germline.input.vcf"
+GVCF="$OUT/germline.input.vcf"
 log "samples in VCF: $(bcftools query -l "$GVCF" | tr '\n' ' ')"
 log "variant count : $(bcftools view -H "$GVCF" | wc -l)"
 
@@ -58,7 +61,7 @@ HAS_ANN=$(bcftools view -h "$GVCF" | grep -cE '^##INFO=<ID=(ANN|CSQ),' || true)
 log "consequence annotation in header (ANN/CSQ): $HAS_ANN"
 
 # ---------- chromosome naming: ClinVar/gnomAD use '1', not 'chr1' ----------
-FIRST_CHR=$(bcftools view -H "$GVCF" | head -1 | cut -f1)
+FIRST_CHR=$(awk '!/^#/{print $1; exit}' "$GVCF")   # no pipe: `| head -1` SIGPIPEs bcftools under pipefail
 if [[ "$FIRST_CHR" == chr* ]]; then
   log "VCF uses 'chr' prefix -> stripping to match ClinVar/gnomAD"
   for c in $(seq 1 22) X Y M; do echo "chr$c $c"; done > "$OUT/chr_strip.txt"
@@ -177,6 +180,10 @@ tabix -f "$OUT/germline.annot.vcf.gz"
 FMT='%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t[%GT]\t[%DP]\t[%AD]\t%INFO/CLNSIG\t%INFO/CLNSIGCONF\t%INFO/CLNREVSTAT\t%INFO/CLNDN\t%INFO/GENEINFO\t%INFO/GNOMAD_AF\t%INFO/GNOMAD_AF_POPMAX\t%INFO/GNOMAD_NHOMALT'
 HDR='CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tGT\tDP\tAD\tCLNSIG\tCLNSIGCONF\tCLNREVSTAT\tCLNDN\tGENEINFO\tGNOMAD_AF\tGNOMAD_AF_POPMAX\tGNOMAD_NHOMALT'
 if (( HAS_ANN )); then FMT="$FMT\t%INFO/ANN"; HDR="$HDR\tANN"; fi
+# Sema4 writes GT as a bare "1"; zygosity is in INFO/CALL_TYPE and their call QC in INFO/RED_FLAGS
+for tag in CALL_TYPE RED_FLAGS; do
+  if bcftools view -h "$GVCF" | grep -q "^##INFO=<ID=$tag,"; then FMT="$FMT\t%INFO/$tag"; HDR="$HDR\t$tag"; fi
+done
 
 # (a) every variant, genome-wide, that ClinVar knows anything about
 { printf "$HDR\n"; bcftools query -i 'INFO/CLNSIG!=""' -f "$FMT\n" "$OUT/germline.annot.vcf.gz"; } > "$OUT/exome_clinvar_hits.tsv"
