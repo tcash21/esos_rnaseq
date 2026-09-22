@@ -18,3 +18,4 @@ results/
 .Rhistory
 .Rproj.user/
 __pycache__/
+review_bundle_*.tar.gz
