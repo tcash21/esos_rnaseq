@@ -43,5 +43,5 @@ All 22 PMIDs in the audit were checked against PubMed E-utilities on 2026-09-22 
 2. Re-run step 01 with the ACMG SF v3.3 gene set.
 3. Phase the two closest MAP4K4 SNVs from read pairs (EC2, minutes); build Supplementary Table S3.
 4. Per-exon RB1 RNA coverage figure (needs the RNA BAM retained in a 02b re-run).
-5. Pathology/IHC and junction PCR on the archived block, if accessible and consented.
+5. ~~Pathology/IHC~~ — **lineage IHC already exists from 2020 (SATB2+, MDM2−, CDK4−, SMA multifocal+, desmin scattered+, keratins−), reviewed by an expert soft-tissue pathologist; incorporated in v0.3.** Still wanted: CD68/CD163/CD8 and KDM3A IHC, junction PCR, if the block is accessible and consented.
 6. Independent adult osteosarcoma expression cohort for age-matched comparison.

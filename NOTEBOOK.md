@@ -32,8 +32,11 @@ germline re-check changed anything.
 
 ## 2. Findings log
 
-### Case context (from family, 2026-09-22)
-- Primary site: **retroperitoneum**, involving major organs (Sema4 requisition says only "abdominal mass"). Retroperitoneum is the second most common ESOS site after the thigh. Treated with **radiation alone** — consistent with an unresectable primary; chemotherapy's benefit in ESOS is unproven. Relevant to the case presentation and to interpreting the stromal, immune and HOX findings below.
+### Case context (family, 2026-09-22; clinical records May–Sept 2020 reviewed 2026-09-22 — source documents are NOT in the repo)
+- Primary site: **retroperitoneum**, right upper quadrant, involving pancreatic head, duodenum, IVC (obliterated; bland thrombus below), aorta (near-circumferential), right ureter/kidney (hydronephrosis), right psoas. Unresectable. 12.6 × 10.3 × 7.6 cm at the diagnostic CT (day 0); 17 × 14 cm at day 50 (during RT); 14.2 × 11.9 (day 112) and 13.1 × 8.2 cm (day 143) after RT. No distant metastasis at diagnosis (chest CT, MRI); two indeterminate pulmonary nodules enlarged to 8 and 4 mm at day 143. `[solid]` from radiology reports.
+- **Pathology**: initial biopsy day 7 (outside) + CT-guided core day 24 at a tertiary sarcoma center, both high-grade ESOS on expert review. **IHC on the core: SATB2+, SMA multifocal+, desmin scattered+, pan-keratin/AE1-AE3/MDM2/CDK4 negative.** The core biopsy (day 24) is the block Sema4 sequenced → **sequenced tissue is pre-treatment**. `[solid]`
+- **Treatment**: primary radiation, 25 fractions over ~6 weeks (days 31–73), interrupted by a 10-day admission at fraction 8 (nausea/vomiting/diarrhea, IVC DVT, small hemoperitoneum). Anticoagulation from day 98. Chemotherapy: reason not documented in the records reviewed. Sema4 report issued day 60. Course after day 143 (Dec 2020 record end) unknown.
+- Implications: (i) DDLPS excluded by IHC as well as genomics; (ii) SMA positivity in *lesional* cells means the MYOCD/ACTA2 transcript signal is likely partly tumor-intrinsic, not only stroma — interpretation revised; (iii) expression data are unaffected by radiation; (iv) an outside CT from ~3 months before diagnosis is referenced in a later report — whether the mass was visible then is an open question for the family.
 
 ### Sema4 report, re-read (2026-09-21)
 - Report (2020-08-03) calls: homozygous deletions TP53 + RB1; TMB 3.77; MSS; no fusions; 1 VUS (MAP4K4 E589Q); 47-row CN appendix, uninterpreted; "hereditary: none found".
@@ -83,7 +86,7 @@ germline re-check changed anything.
 - **The transcriptome is bone-osteosarcoma-like, not soft-tissue-sarcoma-like.** Median Spearman rho (top 2000 variable genes): TARGET-OS 0.62 vs UPS 0.50, MFS 0.48, DDLPS 0.46, LMS 0.39, SS 0.35. 24 of the 25 nearest cohort samples are TARGET-OS. Centroid correlation 0.74 (OS) vs 0.63 (UPS, next). PCA: inside the TARGET-OS cloud, on its UPS/MFS-facing edge (`pca_cohorts.png`). `[solid]` — every method agrees, and a pipeline effect would push the sample away from both cohorts, not toward one.
 - Osteoblastic genes are *typical for OS* (z vs OS ≈ 0 for SPP1, IBSP, COL1A1, ALPL, SP7) and extreme vs STS (SP7 z 5.6, IBSP 3.4, SATB2 2.6). RUNX2 is high even for OS (100th percentile) without being amplified (4 copies = ploidy). `[likely]`
 - **KDM3A: z +4.8 vs OS, 100th percentile of both cohorts** — the 18-copy focal amplification is expressed. Candidate for the write-up's "novel" line; check literature (KDM3A/JMJD1A, H3K9 demethylase, hypoxia-inducible; Ewing sarcoma link). `[likely]`
-- Soft-tissue signal on top of the OS program: MYOCD z 2.9, ACTA2 2.0 vs OS (≈ typical for STS; HMGA2 later withdrawn as a pipeline artifact). With the primary now known to be retroperitoneal and organ-involving, the 43% non-tumor fraction containing vessel/visceral smooth muscle is the simpler explanation; a myofibroblastic tumor component is less likely. `[likely]` stroma; IHC on the block would settle it.
+- Soft-tissue signal on top of the OS program: MYOCD z 2.9 (3.2 on GDC quant), ACTA2 2.0 (1.2) vs OS (≈ typical for STS; HMGA2 later withdrawn as a pipeline artifact). Clinical IHC (2020) showed **multifocal SMA and scattered desmin positivity in lesional cells**, so the signal is likely partly tumor-intrinsic (myoid differentiation is described in ESOS) as well as retroperitoneal stroma. `[likely]` mixed.
 - Immune: PTPRC (CD45) 97th and CD163 97th percentile vs OS, but CD8A/CD3E/NKG7/FOXP3 low (7–30th) and PD-L1 low → macrophage-rich, T-cell-poor. `[likely]`; formal deconvolution pending (06).
 - Telomere: TERT 0 TPM; ATRX *high* (z 2.3) → not ATRX-loss ALT; DAXX low (z −2.0 vs OS, −3.1 vs STS). DAXX-loss ALT is a hypothesis worth one line. `[weak]`
 - Drug-target genes high vs OS: FGFR1 (98th), PDGFRA (100th), ERBB2 (94th). Research-grade only.
@@ -134,6 +137,7 @@ germline re-check changed anything.
 | 09-22 | CD276/B7-H3 "96th percentile" | Within-sample rank only; vs TARGET-OS it is at the 19th percentile | 02 GDC z-scores |
 | 09-22 | "Antigen presentation intact" | "No HLA class I allele loss detected"; TAP1 below OS median | Audit item 18 |
 | 09-22 | "All of Sema4's absolute copy numbers were wrong" | Copy numbers were expressed relative to a diploid reference and flagged approximate by the vendor; allele-specific re-analysis revised them | Audit item 26 |
+| 09-22 | MYOCD/ACTA2 signal "stroma, myofibroblastic component less likely" | Partly tumor-intrinsic: clinical IHC shows multifocal SMA in lesional cells | 2020 pathology report |
 | 09-22 | "T-cell-poor" microenvironment (from raw CD8A/CD3E TPM) | Immune-infiltrated for OS, myeloid-dominated; CD8 at OS median, CD4-type T cells present | Deconvolution vs cohorts (06) |
 | 09-22 | HMGA2 / VEGFA / BGLAP / CDK4 z-scores vs OS | Withdrawn — pipeline artifacts (moved > 1 SD on like-for-like quantification) | 02b |
 | 09-22 | Exon-level log2 values in first step-04 run | Values were self-normalised (mosdepth `total_region` covers only the --by BED); fixed to genome-wide exon mean | Bug, see §5 |
