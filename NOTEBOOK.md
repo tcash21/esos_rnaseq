@@ -21,7 +21,7 @@ germline re-check changed anything.
 | 00 VEP install | EC2 | done 2026-09-22 (cache: Ensembl 116 GRCh37, 24 GB) | — |
 | 01 germline re-check | EC2 | done 2026-09-22, with VEP | `results/01_germline/germline_report.md` |
 | 02 expression vs TARGET-OS / TCGA-SARC | Mac | done 2026-09-22 (rank-based; re-quantification recommended, §4) | `results/02_expression/expression_report.md` |
-| 03 fusion review | Mac | not started (one FusionInspector call already judged artifact, see §2) | |
+| 03 fusion review | Mac | done 2026-09-22; DNA check of two breakpoint chimeras (03b) pending | `results/03_fusions/fusions_report.md` |
 | 04 copy number (FACETS) | EC2 + Mac | done 2026-09-22 | `results/04_copynumber/copynumber_report.md` |
 | 05 somatic re-annotation | EC2 + Mac | done 2026-09-22 (VEP + filter policy + CCF); signatures/GENIE comparison pending | `results/05_somatic/somatic_report.md` |
 | 06 immune / HLA | EC2 + Mac | HLA typing done 2026-09-22; immune deconvolution not started | `results/06_hla/hla_summary.tsv` |
@@ -88,6 +88,11 @@ germline re-check changed anything.
 ### Fusions, first look (2026-09-21)
 - Only FusionInspector-validated call SEC31A--JAK2: 4 junction / 0 spanning reads, non-canonical splice, FFPM 0.02 → artifact. `[solid]` Sema4's "no fusions" stands so far; 605-row raw list not yet reviewed (step 03).
 
+### 03 Fusion review (2026-09-22) — FusionCatcher 176 candidates, Sema4 aggregate 604 rows (= FusionCatcher re-formatted; nothing had a second caller)
+- **No oncogenic fusion.** No candidate involves EWSR1/FUS, SS18, NR4A3, CIC, BCOR, NTRK, HEY1–NCOA2 or any other sarcoma-defining partner with more than artifact-level support. Sema4's "none" stands. `[solid]`
+- 43 of 176 candidates involve COL1A1 (the tumor's top gene at ~9,000 TPM), with many spanning pairs but ≤8 unique reads: template-switching chimeras of an abundant transcript. Same for NEAT1/MALAT1 lncRNA chimeras.
+- **Two "strong" candidates are transcribed DNA breakpoints, not fusions**, and they coincide with FACETS segment boundaries to within a gene: USP39–CTNNA2 (USP39 inside the 18-copy KDM3A amplicon, CTNNA2 at its 4→7-copy flank boundary at 80.10 Mb) and PGAP1–DNAH7 (at the 196.89 / 197.76 Mb 2q segment boundaries). Structural corroboration of the amplicon; PCR-validatable. `[likely]` pending the DNA-level check (03b).
+
 ---
 
 ## 3. Corrections to earlier statements (kept on purpose)
@@ -115,7 +120,8 @@ germline re-check changed anything.
 8. **MAP4K4 cluster = kataegis?** Four strand-coordinated events, 3/4 TpC. Agree with "one APOBEC event" over "four drivers"? Any MAP4K4 sarcoma literature worth citing?
 9. **Somatic TMB**: 1.8/Mb by my policy vs Sema4 3.77; which set did Sema4 count? Matters only for the write-up wording.
 10. **Expression pipeline mismatch.** The tumor is RSEM/RefSeq, the cohorts are GDC STAR/GENCODE v36. Global similarity is robust (rank-based), single-gene z-scores are indicative, genome-wide differential lists are not. Recommended fix (EC2, ~1 h): re-quantify `ISM563041-2.star.sorted.bam` (or re-align from FASTQ if the BAM's STAR index differs) with the GDC pipeline — STAR 2-pass + GENCODE v36 + HTSeq/STAR counts → TPM — and re-run 02. Also worth checking: was the tumor library poly-A or total RNA (Sema4 lists both kits)? Affects comparability to the poly-A cohorts.
-11. **Sema4 mixed male/female CN files** exist (`segData.female.seg`, `.male.seg`); I used the unsuffixed `segData.seg`. Confirm that is the reported one.
+11. **Breakpoint chimeras (03)**: agree that USP39–CTNNA2 and PGAP1–DNAH7 are amplicon-edge rearrangements read out in RNA? 03b will look for the matching discordant DNA reads.
+12. **Sema4 mixed male/female CN files** exist (`segData.female.seg`, `.male.seg`); I used the unsuffixed `segData.seg`. Confirm that is the reported one.
 
 ---
 
