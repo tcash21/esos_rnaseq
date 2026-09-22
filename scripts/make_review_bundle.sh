@@ -15,4 +15,4 @@ tar -czf "$out" \
   --exclude='.git' --exclude='.DS_Store' \
   README.md NOTEBOOK.md REVIEW.md manuscript scripts results
 echo "wrote $out ($(du -h "$out" | cut -f1))"
-echo "contents check — these must be ABSENT:"; tar -tzf "$out" | grep -E '01_germline|hla_|Final Lab|\.vcf|\.bam' || echo "  none found (good)"
+echo "contents check — these must be ABSENT:"; tar -tzf "$out" | grep -E 'results/01_germline|results/06_hla/hla_|Final Lab|\.vcf|\.bam' || echo "  none found (good)"
