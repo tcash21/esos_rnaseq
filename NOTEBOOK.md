@@ -20,7 +20,7 @@ germline re-check changed anything.
 |---|---|---|---|
 | 00 VEP install | EC2 | done 2026-09-22 (cache: Ensembl 116 GRCh37, 24 GB) | — |
 | 01 germline re-check | EC2 | done 2026-09-22, with VEP | `results/01_germline/germline_report.md` |
-| 02 expression vs TARGET-OS / TCGA-SARC | Mac | not started | |
+| 02 expression vs TARGET-OS / TCGA-SARC | Mac | done 2026-09-22 (rank-based; re-quantification recommended, §4) | `results/02_expression/expression_report.md` |
 | 03 fusion review | Mac | not started (one FusionInspector call already judged artifact, see §2) | |
 | 04 copy number (FACETS) | EC2 + Mac | done 2026-09-22 | `results/04_copynumber/copynumber_report.md` |
 | 05 somatic re-annotation | EC2 + Mac | done 2026-09-22 (VEP + filter policy + CCF); signatures/GENIE comparison pending | `results/05_somatic/somatic_report.md` |
@@ -74,6 +74,17 @@ germline re-check changed anything.
 - Strong osteoblastic program: COL1A1 top gene; SPP1, IBSP, ALPL, RUNX2, SP7 all >93rd percentile. Favors bone-OS-like biology. `[weak]` until step 02.
 - T-cell markers near absent (CD8A 0.28 TPM, CD274/PD-L1 0.22), macrophage marker CD163 high, HLA-A/B2M intact. TERT 0.00 TPM (ALT-like telomere maintenance plausible; check ATRX in step 05). CD276/B7-H3 96th percentile.
 
+### 02 Expression vs cohorts (2026-09-22) — TARGET-OS n=88 + TCGA-SARC n=259 (GDC STAR/TPM), tumor quantile-mapped, rank-based
+- **The transcriptome is bone-osteosarcoma-like, not soft-tissue-sarcoma-like.** Median Spearman rho (top 2000 variable genes): TARGET-OS 0.62 vs UPS 0.50, MFS 0.48, DDLPS 0.46, LMS 0.39, SS 0.35. 24 of the 25 nearest cohort samples are TARGET-OS. Centroid correlation 0.74 (OS) vs 0.63 (UPS, next). PCA: inside the TARGET-OS cloud, on its UPS/MFS-facing edge (`pca_cohorts.png`). `[solid]` — every method agrees, and a pipeline effect would push the sample away from both cohorts, not toward one.
+- Osteoblastic genes are *typical for OS* (z vs OS ≈ 0 for SPP1, IBSP, COL1A1, ALPL, SP7) and extreme vs STS (SP7 z 5.6, IBSP 3.4, SATB2 2.6). RUNX2 is high even for OS (100th percentile) without being amplified (4 copies = ploidy). `[likely]`
+- **KDM3A: z +4.8 vs OS, 100th percentile of both cohorts** — the 18-copy focal amplification is expressed. Candidate for the write-up's "novel" line; check literature (KDM3A/JMJD1A, H3K9 demethylase, hypoxia-inducible; Ewing sarcoma link). `[likely]`
+- Soft-tissue signal on top of the OS program: MYOCD z 2.9, ACTA2 2.0, HMGA2 2.8 vs OS (all ≈ typical for STS). Either the 43% non-tumor fraction from an abdominal mass (smooth muscle / myofibroblast stroma) or a genuine myofibroblastic component — this is the ESOS-specific angle. `[open]`; single-cell or IHC would resolve.
+- Immune: PTPRC (CD45) 97th and CD163 97th percentile vs OS, but CD8A/CD3E/NKG7/FOXP3 low (7–30th) and PD-L1 low → macrophage-rich, T-cell-poor. `[likely]`; formal deconvolution pending (06).
+- Telomere: TERT 0 TPM; ATRX *high* (z 2.3) → not ATRX-loss ALT; DAXX low (z −2.0 vs OS, −3.1 vs STS). DAXX-loss ALT is a hypothesis worth one line. `[weak]`
+- Drug-target genes high vs OS: FGFR1 (98th), PDGFRA (100th), ERBB2 (94th). Research-grade only.
+- Odd: E2F1 z −3.3 and CDKN1A (p21) z −2.4 vs OS. p21 low fits TP53 loss; E2F1 low does not fit RB1 loss. Possibly pipeline; `[weak]`.
+- **Genome-wide extremes are NOT usable**: after excluding RP/MIR/antisense/pseudogenes the list is still housekeeping/paralog genes (NDUFA13, EIF4A1, SMN1, BOLA2B) = RSEM/RefSeq vs STAR/GENCODE differences. Section 3 of the report says so explicitly.
+
 ### Fusions, first look (2026-09-21)
 - Only FusionInspector-validated call SEC31A--JAK2: 4 junction / 0 spanning reads, non-canonical splice, FFPM 0.02 → artifact. `[solid]` Sema4's "no fusions" stands so far; 605-row raw list not yet reviewed (step 03).
 
@@ -103,7 +114,8 @@ germline re-check changed anything.
 7. **RB1 p.Thr502Ile** — unreported by Sema4 at 50% AF / 117× depth, database-known. Confirm pathogenicity classification (ClinVar/LOVD RB1) and whether it should go on a corrected clinical record.
 8. **MAP4K4 cluster = kataegis?** Four strand-coordinated events, 3/4 TpC. Agree with "one APOBEC event" over "four drivers"? Any MAP4K4 sarcoma literature worth citing?
 9. **Somatic TMB**: 1.8/Mb by my policy vs Sema4 3.77; which set did Sema4 count? Matters only for the write-up wording.
-10. **Sema4 mixed male/female CN files** exist (`segData.female.seg`, `.male.seg`); I used the unsuffixed `segData.seg`. Confirm that is the reported one.
+10. **Expression pipeline mismatch.** The tumor is RSEM/RefSeq, the cohorts are GDC STAR/GENCODE v36. Global similarity is robust (rank-based), single-gene z-scores are indicative, genome-wide differential lists are not. Recommended fix (EC2, ~1 h): re-quantify `ISM563041-2.star.sorted.bam` (or re-align from FASTQ if the BAM's STAR index differs) with the GDC pipeline — STAR 2-pass + GENCODE v36 + HTSeq/STAR counts → TPM — and re-run 02. Also worth checking: was the tumor library poly-A or total RNA (Sema4 lists both kits)? Affects comparability to the poly-A cohorts.
+11. **Sema4 mixed male/female CN files** exist (`segData.female.seg`, `.male.seg`); I used the unsuffixed `segData.seg`. Confirm that is the reported one.
 
 ---
 
@@ -133,13 +145,14 @@ germline re-check changed anything.
 | 09-22 | 05 | 1 min | VEP on 1,265 calls |
 | 09-22 | 06 | 3 failed starts (conda CLI differs from docs: `optitype run`, razers3 PATH); then 22 min for 3 samples | |
 | 09-22 | 04b | 1 min | RB1 breakpoint split-read search |
+| 09-22 | snapshots | — | snap-0956920fd9e1d9979 (root 100 GB), snap-0f1d1d38aa7663a77 (data 1 TB) taken after the batch; instance stopped, volumes kept |
 
 Cost model: instance ~$0.81/h; the 1 TB gp3 volume ~$93/month whether running or not. Plan: finish EC2 batch (05 VEP, 06 HLA), then snapshot/shrink the volume.
 
 ---
 
 ## 7. Next steps / open questions for the write-up
-- Is ESOS-in-this-patient bone-OS-like or soft-tissue-sarcoma-like? Current evidence (dual TP53/RB1 loss, WGD, 17p11.2 + 8q + KDM3A amplification, osteoblastic expression) points to bone-OS. Step 02 cohort comparison is the test.
+- ~~Is ESOS-in-this-patient bone-OS-like or soft-tissue-sarcoma-like?~~ **Answered 09-22: bone-OS-like on genome (dual TP53/RB1 loss, WGD, 17p11.2 + 8q amplicons) and transcriptome (step 02).** Remaining nuance: the soft-tissue/myofibroblast signal (MYOCD/ACTA2) — stroma or tumor?
 - Mechanism of the high HRD score with clean HR genes germline: somatic hit in BRCA1/2/PALB2/RAD51C? (step 05). ATRX LOH + TERT 0: ALT? (step 05 for an ATRX somatic hit; step 02 for expression).
 - Second CN caller for the purity/ploidy solution.
 - Deposit plan: processed somatic/CN/expression → open; raw + germline → controlled access, consent needed. PHI in the Sema4 PDF (name, DOB, MRN) never leaves `data/`.
