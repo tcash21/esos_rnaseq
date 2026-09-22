@@ -68,8 +68,8 @@ echo ">> idle auto-stop alarm paused until this script exits"
 # ---- push scripts, launch ----
 aws s3 sync scripts/ "$BUCKET/proj/scripts/" --only-show-errors --exclude "*.log"
 CMD_ID=$(aws ssm send-command --region "$REGION" --instance-ids "$IID" \
-  --document-name AWS-RunShellScript --timeout-seconds 7200 \
-  --parameters "$(python3 -c 'import json,sys; print(json.dumps({"commands":[sys.stdin.read()],"executionTimeout":["7200"]}))' <<< "$REMOTE")" \
+  --document-name AWS-RunShellScript --timeout-seconds 14400 \
+  --parameters "$(python3 -c 'import json,sys; print(json.dumps({"commands":[sys.stdin.read()],"executionTimeout":["14400"]}))' <<< "$REMOTE")" \
   --query 'Command.CommandId' --output text)
 echo ">> running on EC2 (command $CMD_ID) — this can take 10–30 min; Ctrl-C re-arms the idle alarm; the remote job keeps running and still syncs to S3"
 
@@ -88,4 +88,4 @@ aws ssm get-command-invocation --region "$REGION" --command-id "$CMD_ID" --insta
 mkdir -p results
 aws s3 sync "$BUCKET/proj/results/" results/ --only-show-errors
 echo ">> results synced to $PROJ_DIR/results/   (status: $st)"
-[[ "$st" == "Success" ]]
+[[ "$st" == "Success" ]] || exit 1
