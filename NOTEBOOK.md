@@ -23,8 +23,8 @@ germline re-check changed anything.
 | 02 expression vs TARGET-OS / TCGA-SARC | Mac | not started | |
 | 03 fusion review | Mac | not started (one FusionInspector call already judged artifact, see §2) | |
 | 04 copy number (FACETS) | EC2 + Mac | done 2026-09-22 | `results/04_copynumber/copynumber_report.md` |
-| 05 somatic re-annotation | EC2 + Mac | EC2 part in progress | |
-| 06 immune / HLA | EC2 + Mac | HLA typing in progress | |
+| 05 somatic re-annotation | EC2 + Mac | done 2026-09-22 (VEP + filter policy + CCF); signatures/GENIE comparison pending | `results/05_somatic/somatic_report.md` |
+| 06 immune / HLA | EC2 + Mac | HLA typing in progress; immune deconvolution not started | |
 | 07 deposit + write-up | Mac | not started | |
 
 ---
@@ -54,6 +54,16 @@ germline re-check changed anything.
 - Single-copy loss + LOH: PTEN, TSC2, CDKN1C. Copy-neutral LOH: ATRX, STK11, CHD5. 32% of autosomal genome is LOH. `[likely]`
 - **HRD scar score 75–81** (LOH 19–20, TAI 31–33, LST 25–28; array cutoff 42). `[weak]` — exome segments are coarser than arrays and WGD inflates LST/TAI; but the magnitude is large. BRCA1/2/PALB2 germline clean, so mechanism is open. Compare with Kovac 2015 (BRCAness in ~30% of OS).
 - HLA locus (6p21.3) segment: 3 total / 1 minor copy — **no HLA LOH** at segment resolution. `[likely]`; LOHHLA-style allele-specific check not done.
+
+### 05 Somatic (2026-09-22) — VEP 116 on Sema4's somatic.vcf, CCF vs FACETS
+- **Sema4's PASS set (1,177) is mostly rescued noise.** 1,018 carry `mutectFiltOverride` (Mutect2 filtered them; Sema4's pipeline overrode), 936 `lowAfT`; the flagged calls sit almost entirely below 5% AF and often come as adjacent clusters in one read family (four "ARID1A" calls at 2% AF within 3 codons; four "DICER1"; four "MXI1" frameshifts). `[solid]` These are not mutations. Sema4 reported none of them, so no harm done clinically, but anyone re-using the VCF must filter.
+- Filter policy (scripts/05_somatic.R): PASS, ≥8 alt reads, AF ≥0.05 SNV / ≥0.10 indel, normal AF ≤0.02 → **87 calls** (82 SNV, 5 indel). Nonsynonymous TMB from that set 1.8/Mb vs Sema4's 3.77 (their definition unknown). `[likely]`
+- **RB1 p.Thr502Ile (c.1505C>T), AF 0.50, 58/117 reads, 0/55 in normal — somatic, clonal, on both retained copies** (CN 2/0 → multiplicity 1.8). COSMIC + HGMD ids; pocket-A domain. **Sema4 did not report it.** So RB1 is inactivated three ways: missense + copy-neutral LOH of exons 1–17 + homozygous deletion of exons 18–24. `[solid]` for the call; pathogenicity of T502I `[likely]` (database-known, pocket domain).
+- **MAP4K4 kataegis-like cluster**: 4 clonal missense SNVs within 1.3 kb (E503K, A507T, E517Q, E620Q; Sema4's "E589Q" is one of these under NM_145686 numbering), all G>A/G>C on the + strand = strand-coordinated C>T/C>G, 3 of 4 in TpC context, all at AF 0.47 with 0 normal reads. Multiplicity ~3 of 5 copies → **pre-WGD event**. Mutect2 filtered three of them as clustered events (the known failure mode for kataegis); Sema4 reported one as a VUS. Interpretation: an APOBEC-type localized hypermutation event, not four independent driver mutations. `[likely]` — 4 events is a small cluster for a formal kataegis call.
+- No somatic hit in BRCA1/2, PALB2, RAD51C/D, ATM, ATRX, TERT promoter (not captured), TP53 (deleted anyway). HRD mechanism remains `[open]`.
+- H3F3A p.Ala115Gly at AF 0.05 (9 reads): not a known hotspot (G34/K27), subclonal at best. Ignore unless it recurs in RNA.
+- Substitution spectrum (82 SNVs): C>T 42, C>G 14, C>A 9 — too few for signature fitting beyond "aging-like with some APOBEC"; SigProfiler on this is optional.
+- Timing: 24 of 87 kept calls have multiplicity ≥2 in gained regions → pre-WGD; the trunk of this tumor (RB1 hit, MAP4K4 cluster, TP53 loss) predates the doubling. `[likely]`
 
 ### Expression, first look (2026-09-21; within-sample percentiles only, no cohort yet)
 - Strong osteoblastic program: COL1A1 top gene; SPP1, IBSP, ALPL, RUNX2, SP7 all >93rd percentile. Favors bone-OS-like biology. `[weak]` until step 02.
@@ -85,7 +95,10 @@ germline re-check changed anything.
 4. **Germline artifact triage** (local report): the calls I dismissed on alt-fraction/mapping grounds (PRSS1 ×2, SLC9B1, GSTT2) — agree?
 5. **Germline CNV screen** has no panel of normals; sensitivity for single-exon deletions is poor. POT1 ambiguity.
 6. **Somatic filter policy** (step 05, pending): Sema4's PASS set includes calls flagged `readsInN` / `lowAfT`. Decide which flags exclude.
-7. **Sema4 mixed male/female CN files** exist (`segData.female.seg`, `.male.seg`); I used the unsuffixed `segData.seg`. Confirm that is the reported one.
+7. **RB1 p.Thr502Ile** — unreported by Sema4 at 50% AF / 117× depth, database-known. Confirm pathogenicity classification (ClinVar/LOVD RB1) and whether it should go on a corrected clinical record.
+8. **MAP4K4 cluster = kataegis?** Four strand-coordinated events, 3/4 TpC. Agree with "one APOBEC event" over "four drivers"? Any MAP4K4 sarcoma literature worth citing?
+9. **Somatic TMB**: 1.8/Mb by my policy vs Sema4 3.77; which set did Sema4 count? Matters only for the write-up wording.
+10. **Sema4 mixed male/female CN files** exist (`segData.female.seg`, `.male.seg`); I used the unsuffixed `segData.seg`. Confirm that is the reported one.
 
 ---
 
@@ -98,6 +111,8 @@ germline re-check changed anything.
 - **gnomAD** for the germline step is fetched for panel genes only (remote region read); exome-wide AF comes from VEP's `MAX_AF` (gnomAD exomes r2.1). Two sources, slightly different populations.
 - **HRD/WGD from exome**: coarser than array/WGS; treat numbers as approximate.
 - **Purity from FACETS vs RNA**: RNA-based deconvolution (step 06) should give a second purity estimate; disagreement would matter.
+- **Sema4 somatic VCF `PASS` is not a usable call set** without re-filtering (§2, step 05). Their reportable-variant review clearly used stricter criteria than the VCF FILTER column; the VCF alone would mislead a re-analysis.
+- CCF/multiplicity use FACETS cval-150 segments and purity 0.57; if the purity solution moves, every CCF moves with it.
 - Expression percentiles so far are within-sample only — not evidence of over-expression until compared with cohorts (step 02).
 
 ---
@@ -110,6 +125,8 @@ germline re-check changed anything.
 | 09-22 | 00 | ~90 min | first attempt killed by idle alarm at 5 min; second ok |
 | 09-22 | 01 (+VEP) | ~4 min | |
 | 09-22 | 04 | 13 min first pass (pileup 10 min); 2 short re-runs for normaliser bug | |
+| 09-22 | 05 | 1 min | VEP on 1,265 calls |
+| 09-22 | 06 | 3 failed starts (conda CLI differs from docs: `optitype run`, razers3 PATH) | |
 
 Cost model: instance ~$0.81/h; the 1 TB gp3 volume ~$93/month whether running or not. Plan: finish EC2 batch (05 VEP, 06 HLA), then snapshot/shrink the volume.
 

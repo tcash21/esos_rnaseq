@@ -17,11 +17,12 @@ OPTI_ENV="${OPTI_ENV:-/data/envs/optitype}"
 export CONDA_PKGS_DIRS="${CONDA_PKGS_DIRS:-/data/tmp/conda_pkgs}"
 log(){ echo "[$(date '+%H:%M:%S')] $*"; }
 
-if [[ ! -x "$OPTI_ENV/bin/OptiTypePipeline.py" ]]; then
+if [[ ! -x "$OPTI_ENV/bin/optitype" ]]; then
   log "creating conda env $OPTI_ENV (optitype)"
   mamba create -y -q -p "$OPTI_ENV" -c conda-forge -c bioconda optitype samtools
 fi
-OPTI="$OPTI_ENV/bin/OptiTypePipeline.py"; SAM="$OPTI_ENV/bin/samtools"
+export PATH="$OPTI_ENV/bin:$PATH"   # the wrapper looks up razers3 / glpsol on PATH
+OPTI="$OPTI_ENV/bin/optitype"; SAM="$OPTI_ENV/bin/samtools"   # bioconda ships an "optitype" wrapper, not OptiTypePipeline.py
 
 NBAM=$(find -L "$DATA" -name 'ISM556054-2.dedup.recal.bam' | head -1)
 TBAM=$(find -L "$DATA" -name 'ISM556046-2.dedup.recal.bam' | head -1)
@@ -47,8 +48,8 @@ for spec in "normal_dna:$NBAM:dna" "tumor_dna:$TBAM:dna" "tumor_rna:$RBAM:rna"; 
   log "$name: extracting MHC reads"; extract "$bam" "$name"
   log "$name: OptiType ($kind)"
   rm -rf "$OUT/opti_$name"; mkdir -p "$OUT/opti_$name"
-  "$OPTI_ENV/bin/python" "$OPTI" -i "$OUT/$name.R1.fq" "$OUT/$name.R2.fq" --$kind -o "$OUT/opti_$name" -p "$name" -v
-  cp "$OUT/opti_$name"/*/"${name}_result.tsv" "$OUT/hla_${name}_result.tsv"
+  "$OPTI" run -i "$OUT/$name.R1.fq" -i "$OUT/$name.R2.fq" --$kind -o "$OUT/opti_$name"   # optitype 1.5 CLI (bioconda)
+  cp "$(find "$OUT/opti_$name" -name '*_result.tsv' | head -1)" "$OUT/hla_${name}_result.tsv"
   rm -f "$OUT/$name".R[12].fq
 done
 
