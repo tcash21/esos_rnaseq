@@ -1,4 +1,4 @@
-# mom_esos — extraskeletal osteosarcoma (ESOS) case genomics
+# Extraskeletal osteosarcoma (ESOS) case genomics
 
 Tumor–normal whole-exome + tumor whole-transcriptome (Sema4 Signal WES/WTS, 2020, hg19).
 Tumor purity 90%, tumor 276x, normal 122x, RNA 327M reads. Diagnosis: high-grade ESOS, abdominal mass.
