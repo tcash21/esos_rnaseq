@@ -25,7 +25,7 @@ germline re-check changed anything.
 | 03 fusion review | Mac | done 2026-09-22 incl. STAR cross-check; 03b DNA check inconclusive (exome) | `results/03_fusions/fusions_report.md` |
 | 04 copy number (FACETS) | EC2 + Mac | done 2026-09-22 | `results/04_copynumber/copynumber_report.md` |
 | 05 somatic re-annotation | EC2 + Mac | done 2026-09-22 (VEP + filter policy + CCF); signatures/GENIE comparison pending | `results/05_somatic/somatic_report.md` |
-| 06 immune / HLA | EC2 + Mac | HLA typing done 2026-09-22; immune deconvolution not started | `results/06_hla/hla_summary.tsv` |
+| 06 immune / HLA | EC2 + Mac | done 2026-09-22 (HLA typing; MCP-counter + quanTIseq on the GDC quantification) | `results/06_hla/immune_report.md`, `hla_summary.tsv` (local) |
 | 07 deposit + write-up | Mac | not started | |
 
 ---
@@ -59,7 +59,8 @@ germline re-check changed anything.
 
 ### 06 HLA class I (2026-09-22) — OptiType 1.5 on normal DNA, tumor DNA, tumor RNA
 - Heterozygous at HLA-A, -B and -C; **identical 4-digit calls from all three samples**, and all six alleles are expressed in tumor RNA. Combined with the 3/1 FACETS state at 6p21: no HLA loss of any kind. `[solid]` Alleles are in `results/06_hla/hla_summary.tsv` (local only — germline-level information).
-- Immune deconvolution (quanTIseq / MCP-counter on genes.results) is the Mac part, not started.
+- **Immune deconvolution (2026-09-22; MCP-counter + quanTIseq, tumor + both cohorts on the GDC quantification)**: the tumor is *immune-infiltrated for an osteosarcoma* and **myeloid-dominated**. MCP-counter monocytic lineage above every TARGET-OS sample (100th percentile; 97th in TCGA-SARC), neutrophils 94th, NK 91st, T cells 93rd, but CD8 T cells at the OS median (53rd). quanTIseq: macrophages M1 6% + M2 11% (OS medians 1% + 7%), CD4-type T cells 5%, CD8 ~0, dendritic 6%; "Other" 66% is the 2nd percentile of OS, i.e. more non-tumor content than 98% of the cohort — consistent with FACETS purity 0.57. `[likely]` (two methods agree on the myeloid picture; absolute fractions carry the total-RNA caveat).
+- Reading: a macrophage-rich, CD8-poor, PD-L1-low microenvironment — the "myeloid" OS phenotype that does not respond to checkpoint blockade; macrophage-directed or B7-H3-type approaches would be the rational research angle, not PD-1.
 
 ### 05 Somatic (2026-09-22) — VEP 116 on Sema4's somatic.vcf, CCF vs FACETS
 - **Sema4's PASS set (1,177) is mostly rescued noise.** 1,018 carry `mutectFiltOverride` (Mutect2 filtered them; Sema4's pipeline overrode), 936 `lowAfT`; the flagged calls sit almost entirely below 5% AF and often come as adjacent clusters in one read family (four "ARID1A" calls at 2% AF within 3 codons; four "DICER1"; four "MXI1" frameshifts). `[solid]` These are not mutations. Sema4 reported none of them, so no harm done clinically, but anyone re-using the VCF must filter.
@@ -118,6 +119,8 @@ germline re-check changed anything.
 | 09-21 | "Genome probably doubled; purity may be 55–67%" | WGD confirmed; purity 0.57 | FACETS |
 | 09-21 | TP53/RB1 "homozygous deletion unproven, may be partial/subclonal" | Both are clonal homozygous deletions | Log-ratio matches 0 copies at purity 0.57 |
 | 09-21 | Residual TP53/RB1 expression "suggests retained exons" | Explained by normal-cell contamination | purity 0.57 |
+| 09-22 | "T-cell-poor" microenvironment (from raw CD8A/CD3E TPM) | Immune-infiltrated for OS, myeloid-dominated; CD8 at OS median, CD4-type T cells present | Deconvolution vs cohorts (06) |
+| 09-22 | HMGA2 / VEGFA / BGLAP / CDK4 z-scores vs OS | Withdrawn — pipeline artifacts (moved > 1 SD on like-for-like quantification) | 02b |
 | 09-22 | Exon-level log2 values in first step-04 run | Values were self-normalised (mosdepth `total_region` covers only the --by BED); fixed to genome-wide exon mean | Bug, see §5 |
 | 09-22 | Germline screen "98 exons LOW" | Untargeted UTR/non-coding exons from refGene, not deletions; now judged per gene on captured exons | Method fix |
 
