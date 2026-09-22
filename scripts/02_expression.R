@@ -20,12 +20,22 @@
 # =============================================================================
 suppressPackageStartupMessages({ library(data.table); library(ggplot2) })
 proj <- Sys.getenv("PROJ", getwd())
-xena <- file.path(proj, "refs/xena"); out <- file.path(proj, "results/02_expression"); dir.create(out, showWarnings = FALSE, recursive = TRUE)
+xena <- file.path(proj, "refs/xena")
+# QUANT=sema4 (default): Sema4's RSEM/RefSeq TPM.  QUANT=gdc: our GDC-recipe re-quantification (02b), same
+# STAR/GENCODE v36 pipeline as the cohorts -> like-for-like (library prep still differs: total RNA vs poly-A).
+quant <- Sys.getenv("QUANT", "sema4")
+out <- file.path(proj, "results/02_expression", if (quant == "gdc") "gdc_requant" else "."); dir.create(out, showWarnings = FALSE, recursive = TRUE)
 set.seed(1)
 
 # ---------- tumor ----------
-gf <- list.files(file.path(proj, "data/sema4"), "ISM563041-2\\.genes\\.results$", recursive = TRUE, full.names = TRUE)[1]
-tum <- fread(gf)[, .(gene = sub("^HGNC:[0-9]+_", "", gene_id), tpm = TPM)][, .(tpm = sum(tpm)), by = gene]
+if (quant == "gdc") {
+  gf <- file.path(proj, "results/02_expression/requant/ISM563041-2.gdc.genes.tsv")
+  tum <- fread(gf)[, .(gene = gene_name, tpm = tpm_unstranded)][, .(tpm = sum(tpm)), by = gene]   # unstranded = GDC's cohort convention
+} else {
+  gf <- list.files(file.path(proj, "data/sema4"), "ISM563041-2\\.genes\\.results$", recursive = TRUE, full.names = TRUE)[1]
+  tum <- fread(gf)[, .(gene = sub("^HGNC:[0-9]+_", "", gene_id), tpm = TPM)][, .(tpm = sum(tpm)), by = gene]
+}
+cat(sprintf("tumor quantification: %s (%s)\n", quant, gf))
 
 # ---------- cohorts ----------
 pm <- fread(file.path(xena, "gencode.v36.annotation.gtf.gene.probemap"))[, .(id, gene)]
@@ -120,7 +130,11 @@ sd_os <- apply(X[, i_os], 1, sd)
 zall <- (t_q - rowMeans(X[, i_os])) / sd_os
 ext <- data.table(gene = genes, z_vs_OS = round(zall, 2), tumor_mapped = round(t_q, 2), OS_mean = round(rowMeans(X[, i_os]), 2), OS_sd = round(sd_os, 2),
                   z_vs_STS = round((t_q - rowMeans(X[, i_sa])) / apply(X[, i_sa], 1, sd), 2))
-ext <- ext[!grepl("^(RPL|RPS|MRPL|MRPS|MIR|SNOR|SNHG|LINC|LOC)|-AS[0-9]*$|P[0-9]+$", gene) & OS_sd >= 0.5 & abs(tumor_mapped - OS_mean) >= 2][order(-abs(z_vs_OS))]
+# Library-prep classes (tumor = total RNA, cohorts = poly-A): histone mRNAs, sn/sno/scaRNA, 7SL, Y_RNA, MT- genes.
+# PAR1 genes: present on X and Y in the GENCODE reference -> multimapped -> dropped by STAR GeneCounts in our run.
+par1 <- c("PLCXD1","GTPBP6","PPP2R3B","SHOX","CRLF2","CSF2RA","IL3RA","SLC25A6","ASMTL","P2RY8","AKAP17A","ASMT","DHRSX","ZBED1","CD99","XG")
+ext <- ext[!grepl("^(RPL|RPS|MRPL|MRPS|MIR|SNOR|SNHG|SCARNA|LINC|LOC|RNU|RN7S|Y_RNA|U[0-9]$|MT-|H1-|H[1-4]C[0-9]|H2[AB]C[0-9]|H2[AB]Z|A[CLP][0-9]{6}\\.|Z[0-9]{5}\\.)|-AS[0-9]*$|P[0-9]+$", gene) &
+           !gene %in% par1 & OS_sd >= 0.5 & abs(tumor_mapped - OS_mean) >= 2][order(-abs(z_vs_OS))]
 fwrite(ext, file.path(out, "tumor_extremes_vs_TARGETOS.tsv"), sep = "\t")
 
 # ---------- report ----------
@@ -128,7 +142,7 @@ f2 <- function(x) sprintf("%.2f", x)
 gz_tab <- function(s) c("| gene | tumor TPM | z vs OS | %ile OS | z vs STS | %ile STS |", "|---|---|---|---|---|---|",
   gz[set == s][order(-z_vs_OS), sprintf("| %s | %.1f | %s | %d | %s | %d |", gene, tumor_tpm, f2(z_vs_OS), pct_vs_OS, f2(z_vs_STS), pct_vs_STS)])
 rep <- c("# Expression — ESOS tumor vs TARGET-OS (bone OS) and TCGA-SARC (soft-tissue sarcoma)",
-  paste0("_generated ", Sys.Date(), "; rank-based, see script header for the pipeline caveat_"), "",
+  paste0("_generated ", Sys.Date(), "; tumor quantification: **", if (quant == "gdc") "GDC recipe (STAR 2-pass, GRCh38, GENCODE v36; step 02b) — same pipeline as the cohorts" else "Sema4 RSEM/RefSeq (cross-pipeline; see caveat)", "**; rank-based_"), "",
   sprintf("Genes compared: %d. Cohorts: TARGET-OS n=%d; TCGA-SARC n=%d (%s).", length(genes), sum(i_os), sum(i_sa),
           paste(names(table(sa_group)), table(sa_group), sep = "=", collapse = ", ")), "",
   "## 1. Which cohort does the tumor resemble? (Spearman, top 2000 variable genes)",
@@ -144,8 +158,10 @@ rep <- c("# Expression — ESOS tumor vs TARGET-OS (bone OS) and TCGA-SARC (soft
   "### Telomere maintenance", gz_tab("telomere_alt"), "", "### Immune", gz_tab("immune"), "",
   "### Soft-tissue-sarcoma lineage markers (LMS: DES/ACTA2/MYOCD/CNN1; MPNST: S100B/SOX10; SS: TLE1; DDLPS: MDM2/HMGA2)", gz_tab("sts_markers"), "",
   "### Receptor tyrosine kinases / drug targets", gz_tab("rtk_targets"), "",
-  "## 3. Genome-wide extremes vs TARGET-OS — NOT RELIABLE for this single cross-pipeline sample",
-  "_Even after excluding RP/MIR/antisense/pseudogenes and requiring cohort SD >= 0.5 and a 4-fold shift, the list is dominated by housekeeping and paralog-family genes (NDUFA13, EIF4A1, SMN1, BOLA2B, NBPF10): these are RSEM/RefSeq vs STAR/GENCODE quantification differences, not biology. Use only the global similarity (section 1) and the targeted panel (section 2, with the same caveat for any single gene). Fix: re-quantify the tumor RNA BAM with the GDC pipeline (STAR + GENCODE v36) — see NOTEBOOK._",
+  if (quant == "gdc") c("## 3. Genome-wide extremes vs TARGET-OS (same quantification pipeline; library-prep-sensitive classes and PAR1 genes excluded; cohort SD >= 0.5; >= 4-fold)",
+    "_Remaining confounder: total-RNA (tumor) vs poly-A (cohorts) library prep. Treat single genes as leads, not results._") else
+  c("## 3. Genome-wide extremes vs TARGET-OS — NOT RELIABLE for this cross-pipeline run",
+    "_Dominated by housekeeping/paralog genes = RSEM/RefSeq vs STAR/GENCODE differences. See results/02_expression/gdc_requant/ for the like-for-like run (QUANT=gdc)._"),
   "Up:", ext[z_vs_OS > 0][1:25, paste0(gene, " (", f2(z_vs_OS), ")", collapse = ", ")], "",
   "Down:", ext[z_vs_OS < 0][1:25, paste0(gene, " (", f2(z_vs_OS), ")", collapse = ", ")], "",
   "## Reading guide",

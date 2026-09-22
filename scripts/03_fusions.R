@@ -49,12 +49,26 @@ fi <- fread(ff("FusionInspector\\.fusions\\.abridged\\.tsv$"))
 # ---------- STAR chimeric junctions from 02b (optional cross-check) ----------
 chim <- file.path(proj, "results/02_expression/requant/ISM563041-2.Chimeric.out.junction")
 chim_note <- if (file.exists(chim)) {
-  cj <- fread(chim, header = FALSE, fill = TRUE)[V1 != V4 | abs(V2 - V5) > 1e5]     # inter-chromosomal or > 100 kb
-  cj[, key := paste0(V1, ":", round(V2 / 1e4), "-", V4, ":", round(V5 / 1e4))]
-  top <- cj[, .N, by = key][order(-N)][N >= 5]
-  c(sprintf("STAR (GRCh38, 02b) chimeric junctions: %d distant/interchromosomal split reads; %d junction clusters (10 kb bins) with >= 5 reads:", nrow(cj), nrow(top)),
-    if (nrow(top)) top[1:min(15, .N), sprintf("- %s  (%d reads)", key, N)] else "- none",
-    "_Coordinates are GRCh38 here vs hg19 in the Sema4 files; compare by gene, not position._")
+  cj <- fread(cmd = paste("grep -v '^#'", shQuote(chim)), header = TRUE, select = 1:7)   # STAR chimOutJunctionFormat 1: header + '#' footer
+  setnames(cj, c("cA", "bA", "sA", "cB", "bB", "sB", "jtype"))
+  std <- paste0("chr", c(1:22, "X", "Y"))
+  cj <- cj[jtype >= 0 & cA %in% std & cB %in% std & (cA != cB | abs(bA - bB) > 5e5)]   # > 500 kb: adjacent-gene read-through is not a fusion
+  # annotate both ends to GENCODE v36 genes (protein-coding + lncRNA only; rRNA/7SL/snRNA chimeras are library artifacts)
+  pmg <- fread(file.path(proj, "refs/xena/gencode.v36.annotation.gtf.gene.probemap"))[, .(gene, chrom, start = chromStart, end = chromEnd)]
+  pmg <- pmg[!grepl("^(RNA5|RNA1|RNA2|RN7S|RNU|RNY|Y_RNA|SNOR|SCARNA|MIR|MT-|Metazoa|U[0-9])", gene)]
+  setkey(pmg, chrom, start, end)
+  ann <- function(ch, pos) { q <- data.table(chrom = ch, start = pos, end = pos); r <- foverlaps(q, pmg, mult = "first", nomatch = NA); r$gene }
+  cj[, `:=`(gA = ann(cA, bA), gB = ann(cB, bB))]
+  gp <- cj[!is.na(gA) & !is.na(gB) & gA != gB, .(reads = .N), by = .(gA, gB)][order(-reads)]
+  gp[, sarcoma := gA %in% sarcoma_partners | gB %in% sarcoma_partners]
+  want <- gp[(gA == "USP39" & gB == "CTNNA2") | (gA == "CTNNA2" & gB == "USP39") | (gA == "PGAP1" & gB == "DNAH7") | (gA == "DNAH7" & gB == "PGAP1")]
+  c(sprintf("STAR (GRCh38, 02b): %d distant/interchromosomal split reads on standard chromosomes; %d gene pairs with >= 10 reads.", nrow(cj), gp[reads >= 10, .N]),
+    "- Breakpoint chimeras from FusionCatcher reproduced by STAR? ",
+    if (nrow(want)) want[, sprintf("  - **%s–%s**: %d split reads", gA, gB, reads)] else "  - neither USP39–CTNNA2 nor PGAP1–DNAH7 seen (STAR's chimeric detection is stricter; not evidence against)",
+    "- Gene pairs involving a sarcoma-relevant partner, >= 5 reads:",
+    if (gp[sarcoma & reads >= 5, .N]) gp[sarcoma & reads >= 5][1:min(10, .N), sprintf("  - %s–%s: %d reads", gA, gB, reads)] else "  - none",
+    "- Top gene pairs overall (>= 50 reads; expect abundant-transcript artifacts such as COL1A1/COL1A2/COL3A1):",
+    gp[reads >= 50][1:min(12, .N), sprintf("  - %s–%s: %d", gA, gB, reads)])
 } else "_STAR Chimeric.out.junction not present yet (run 02b)_"
 
 # ---------- write ----------
