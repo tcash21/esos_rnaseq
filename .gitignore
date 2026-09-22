@@ -19,3 +19,7 @@ results/
 .Rproj.user/
 __pycache__/
 review_bundle_*.tar.gz
+# ---- clinical records (PHI): never commit ----
+medical_reports/
+*.PDF
+*.pdf
