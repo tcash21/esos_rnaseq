@@ -20,8 +20,9 @@ germline re-check changed anything.
 |---|---|---|---|
 | 00 VEP install | EC2 | done 2026-09-22 (cache: Ensembl 116 GRCh37, 24 GB) | — |
 | 01 germline re-check | EC2 | done 2026-09-22, with VEP | `results/01_germline/germline_report.md` |
-| 02 expression vs TARGET-OS / TCGA-SARC | Mac | done 2026-09-22 (rank-based; re-quantification recommended, §4) | `results/02_expression/expression_report.md` |
-| 03 fusion review | Mac | done 2026-09-22; DNA check of two breakpoint chimeras (03b) pending | `results/03_fusions/fusions_report.md` |
+| 02 expression vs TARGET-OS / TCGA-SARC | Mac | done 2026-09-22; **re-run on GDC-recipe quantification (02b) is the reference version** | `results/02_expression/gdc_requant/expression_report.md` (Sema4-quant run kept alongside) |
+| 02b RNA re-quantification (GDC recipe) | EC2 | done 2026-09-22 (163.7 M pairs, 86.8% unique, reverse-stranded) | `results/02_expression/requant/` |
+| 03 fusion review | Mac | done 2026-09-22 incl. STAR cross-check; 03b DNA check inconclusive (exome) | `results/03_fusions/fusions_report.md` |
 | 04 copy number (FACETS) | EC2 + Mac | done 2026-09-22 | `results/04_copynumber/copynumber_report.md` |
 | 05 somatic re-annotation | EC2 + Mac | done 2026-09-22 (VEP + filter policy + CCF); signatures/GENIE comparison pending | `results/05_somatic/somatic_report.md` |
 | 06 immune / HLA | EC2 + Mac | HLA typing done 2026-09-22; immune deconvolution not started | `results/06_hla/hla_summary.tsv` |
@@ -83,7 +84,21 @@ germline re-check changed anything.
 - Telomere: TERT 0 TPM; ATRX *high* (z 2.3) → not ATRX-loss ALT; DAXX low (z −2.0 vs OS, −3.1 vs STS). DAXX-loss ALT is a hypothesis worth one line. `[weak]`
 - Drug-target genes high vs OS: FGFR1 (98th), PDGFRA (100th), ERBB2 (94th). Research-grade only.
 - Odd: E2F1 z −3.3 and CDKN1A (p21) z −2.4 vs OS. p21 low fits TP53 loss; E2F1 low does not fit RB1 loss. Possibly pipeline; `[weak]`.
-- **Genome-wide extremes are NOT usable**: after excluding RP/MIR/antisense/pseudogenes the list is still housekeeping/paralog genes (NDUFA13, EIF4A1, SMN1, BOLA2B) = RSEM/RefSeq vs STAR/GENCODE differences. Section 3 of the report says so explicitly.
+- Genome-wide extremes on the Sema4 quantification were NOT usable (housekeeping/paralog genes = pipeline differences) → motivated 02b.
+
+### 02 re-run on the GDC-recipe quantification (2026-09-22) — like-for-like with the cohorts; total-RNA vs poly-A remains
+- **Sharper, same answer**: median rho TARGET-OS 0.64 vs best STS 0.42 (MFS/UPS); 25/25 nearest neighbours are OS; centroid 0.75 vs 0.52; PCA distance 27 vs 62. `[solid]`
+- Key-gene z-scores mostly stable (< 0.5 SD). **Downgraded as pipeline artifacts**: HMGA2 (2.75 → 0.71), VEGFA (0.85 → −0.44), BGLAP, CDK4 (0.13 → −1.19), MDM2 (1.14 → 0.39, i.e. not elevated — no DDLPS-like signal). **Robust**: KDM3A +4.3, RUNX2 +2.3, MYOCD +3.2 (ACTA2 softened to +1.2), PDGFRA +2.0, FGFR1 +2.0, CD163 +2.1, PTPRC +1.6, ATRX +2.1, DAXX −1.8, CDKN1A −2.3, E2F1 −2.4, TP53 −1.4, CDKN1C −2.3, CDK6 +2.2, TOP2A +2.2. ERBB2 dropped to +0.7 (remove from the drug-target line).
+- **The whole KDM3A amplicon is transcribed**: six of the top genome-wide "up" genes (TGOLN2, ELMOD3, GGCX, MAT2A, POLR1A, PTCD3; GRCh38 chr2:85.3–86.1 Mb) are amplicon neighbours of KDM3A, plus CYTOR. So the amplicon (~5 Mb, 18 copies) drives coordinate over-expression; KDM3A is the best candidate driver by function, not the only over-expressed gene. 2p11.2 is not a classic OS amplicon (6p12–21, 8q24, 12q13–15, 17p11.2, 19q12 are) → novel. `[likely]`
+- **No limb HOX code**: HOXC10 z −4.6, HOXA10 −4.0, HOXA11 −3.1, HOXA9 −2.9, PITX1 −2.5, MSX1 −3.9 vs TARGET-OS (near-zero expression). Skeletal OS carries the limb positional identity of its site of origin; this abdominal tumor does not — same osteoblastic lineage program, different positional identity. `[likely]` (large effects, poly-A mRNAs so library prep is unlikely to explain it). An ESOS-specific observation worth a figure.
+- Library-prep signature visible and excluded: histone mRNAs, sn/scaRNA, 7SL, Y_RNA "up" (non-polyA, present in total RNA only); PAR1 genes (CD99, SLC25A6, IL3RA…) "down" because the GENCODE reference carries PAR on X and Y and STAR drops the multimappers. Neither is biology; both are filtered in the script.
+
+### 03 cross-check with the independent STAR alignment (02b) and the DNA check (03b)
+- 870 k distant/interchromosomal chimeric reads (total RNA → many rDNA/7SL/collagen artifacts). **No canonical sarcoma fusion** (EWSR1/FUS/SS18/NR4A3/CIC/BCOR/NTRK) in either caller. `[solid]`
+- **PPP1CB–ALK (43 reads) is noise**: ALK 0.4 TPM, six different breakpoints, non-canonical junctions — stated explicitly because ALK is targetable.
+- CTNNA2–USP39 reproduced by STAR (6 split reads); KDM3A–CYTOR (71 reads) is another intra-amplicon junction. `[likely]` at RNA level.
+- **MAP4K4–SLC9A2: 173 STAR split reads sharing one acceptor (GRCh38 chr2:102,453,450) with donors fanning across MAP4K4** → transcription across a genomic breakpoint at the 3' end of MAP4K4, ~10–15 kb from the kataegis cluster. Kataegis adjacent to a rearrangement junction is the expected APOBEC pattern (Nik-Zainal 2012). `[likely]` at RNA level; not seen by FusionCatcher.
+- **03b DNA check (exome): inconclusive for all three** (USP39–CTNNA2: 1 tumor pair, 0 normal; PGAP1–DNAH7: 0; MAP4K4 locus: 0). Partner sites are intronic/intergenic, outside capture. Needs WGS or junction PCR. `[open]`
 
 ### Fusions, first look (2026-09-21)
 - Only FusionInspector-validated call SEC31A--JAK2: 4 junction / 0 spanning reads, non-canonical splice, FFPM 0.02 → artifact. `[solid]` Sema4's "no fusions" stands so far; 605-row raw list not yet reviewed (step 03).
@@ -120,7 +135,8 @@ germline re-check changed anything.
 8. **MAP4K4 cluster = kataegis?** Four strand-coordinated events, 3/4 TpC. Agree with "one APOBEC event" over "four drivers"? Any MAP4K4 sarcoma literature worth citing?
 9. **Somatic TMB**: 1.8/Mb by my policy vs Sema4 3.77; which set did Sema4 count? Matters only for the write-up wording.
 10. **Expression pipeline mismatch.** The tumor is RSEM/RefSeq, the cohorts are GDC STAR/GENCODE v36. Global similarity is robust (rank-based), single-gene z-scores are indicative, genome-wide differential lists are not. Recommended fix (EC2, ~1 h): re-quantify `ISM563041-2.star.sorted.bam` (or re-align from FASTQ if the BAM's STAR index differs) with the GDC pipeline — STAR 2-pass + GENCODE v36 + HTSeq/STAR counts → TPM — and re-run 02. Also worth checking: was the tumor library poly-A or total RNA (Sema4 lists both kits)? Affects comparability to the poly-A cohorts.
-11. **Breakpoint chimeras (03)**: agree that USP39–CTNNA2 and PGAP1–DNAH7 are amplicon-edge rearrangements read out in RNA? 03b will look for the matching discordant DNA reads.
+11. **Breakpoint chimeras (03)**: USP39–CTNNA2, PGAP1–DNAH7, KDM3A–CYTOR and MAP4K4–SLC9A2 as transcribed DNA rearrangements — agree? Exome DNA could not confirm (03b). If the block is accessible, a junction PCR on the MAP4K4 3' breakpoint would also anchor the kataegis story.
+11b. **HOX/positional identity** and **amplicon-wide over-expression** (02, GDC run): worth a figure each? Check whether TARGET-OS site-of-origin metadata lets us show HOX code tracks site (femur/tibia vs axial) within the cohort.
 12. **Sema4 mixed male/female CN files** exist (`segData.female.seg`, `.male.seg`); I used the unsuffixed `segData.seg`. Confirm that is the reported one.
 
 ---
@@ -151,6 +167,8 @@ germline re-check changed anything.
 | 09-22 | 05 | 1 min | VEP on 1,265 calls |
 | 09-22 | 06 | 3 failed starts (conda CLI differs from docs: `optitype run`, razers3 PATH); then 22 min for 3 samples | |
 | 09-22 | 04b | 1 min | RB1 breakpoint split-read search |
+| 09-22 | 02b | 1 h 45 min | genome download slow (EBI FTP), index 30 min, STAR 2-pass 71 min |
+| 09-22 | 03b | 1 min | exome DNA check of RNA chimeras — inconclusive |
 | 09-22 | snapshots | — | snap-0956920fd9e1d9979 (root 100 GB), snap-0f1d1d38aa7663a77 (data 1 TB) taken after the batch; instance stopped, volumes kept |
 
 Cost model: instance ~$0.81/h; the 1 TB gp3 volume ~$93/month whether running or not. Plan: finish EC2 batch (05 VEP, 06 HLA), then snapshot/shrink the volume.
