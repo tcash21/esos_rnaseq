@@ -27,7 +27,10 @@ rd   <- function(f) fread(file.path(out, f), sep = "\t", na.strings = c(".", "",
 exome <- rd("exome_clinvar_hits.tsv")
 panel <- rd("panel_all_variants.tsv")
 genes <- readLines(file.path(out, "panel_genes.txt"))
-has_ann <- "ANN" %in% names(panel)
+has_ann <- "ANN" %in% names(panel)      # SnpEff (if the vendor VCF carried it)
+has_vep <- "IMPACT" %in% names(panel)   # VEP columns from +split-vep (run_ec2.sh 00 installs VEP)
+lof_f   <- file.path(out, "exome_lof_unclassified.tsv")
+lof     <- if (has_vep && file.exists(lof_f)) rd("exome_lof_unclassified.tsv") else NULL
 
 # ---------- helpers ----------
 num <- function(x) suppressWarnings(as.numeric(x))
@@ -51,14 +54,20 @@ prep <- function(d) {
   if ("CALL_TYPE" %in% names(d))   # Sema4: GT is a bare "1", zygosity lives in INFO/CALL_TYPE
     d[is.na(zygosity), zygosity := fcase(CALL_TYPE == "het", "het", grepl("^hom", CALL_TYPE), "hom", default = NA_character_)]
   d[, alt_frac := vapply(strsplit(AD, ","), function(a) { a <- num(a); if (length(a) < 2 || sum(a) == 0) NA_real_ else a[2] / sum(a) }, 0)]
-  if (has_ann) {   # SnpEff ANN: Allele|Annotation|Impact|Gene_Name|...  (first entry = most severe)
+  if (has_vep) {   # one picked transcript per variant
+    d[, `:=`(consequence = Consequence, impact = IMPACT, max_af = num(MAX_AF),
+             hgvsp = sub("%3D", "=", sub("^[^:]*:", "", HGVSp), fixed = TRUE), hgvsc = sub("^[^:]*:", "", HGVSc))]
+    d[is.na(gene) | gene == "", gene := SYMBOL]
+    d[is.na(af_popmax), af_popmax := max_af]   # remote gnomAD covers panel genes only; VEP's MAX_AF is exome-wide
+  } else if (has_ann) {   # SnpEff ANN: Allele|Annotation|Impact|Gene_Name|...  (first entry = most severe)
     a <- tstrsplit(sub(",.*", "", d$ANN), "|", fixed = TRUE)
     d[, `:=`(consequence = a[[2]], impact = a[[3]], ann_gene = a[[4]])]
     d[is.na(gene) | gene == "", gene := ann_gene]
   }
   d[]
 }
-exome <- prep(exome); panel <- prep(panel)
+exome <- prep(exome); panel <- prep(panel); if (!is.null(lof)) lof <- prep(lof)
+has_csq <- has_vep || has_ann
 
 # gene symbol for panel variants that ClinVar doesn't know (no GENEINFO): look up from panel.bed
 bed <- fread(file.path(out, "panel.bed"), col.names = c("chrom", "start", "end", "bed_gene"), colClasses = "character")
@@ -79,28 +88,37 @@ t1[, priority := fcase(in_panel & stars >= 2, "HIGH",
 # ---------- Tier 2: rare panel variants ----------
 t2 <- panel[is_plp == FALSE & is_conf == FALSE & (is.na(af_popmax) | af_popmax < 0.005)]
 t2 <- t2[!grepl("Benign", CLNSIG) | is.na(CLNSIG)]
-if (has_ann) t2 <- t2[impact %in% c("HIGH", "MODERATE")]
+if (has_csq) t2 <- t2[impact %in% c("HIGH", "MODERATE")]
 t2[, gene_panel := gene %in% genes]
 setorder(t2, -gene_panel, af_popmax, na.last = FALSE)
 
 # ---------- Tier 3: conflicting in panel ----------
 t3 <- panel[is_conf == TRUE]
 
+# ---------- Tier 4: rare loss-of-function variants ClinVar has not classified (exome-wide; needs VEP) ----------
+# Clean calls only: a true het sits near 0.5, and Sema4's mq/deviantAf flags mark paralog mis-mapping.
+t4 <- if (is.null(lof)) panel[0] else
+  lof[(is.na(af_popmax) | af_popmax < 1e-3) & alt_frac >= 0.3 & num(DP) >= 20 &
+      !(if ("RED_FLAGS" %in% names(lof)) grepl("mqTooLow|deviantAf|techFail|badDp", RED_FLAGS) else FALSE)]
+t4[, in_panel := gene %in% genes]; setorder(t4, -in_panel, af_popmax, na.last = FALSE)
+
 # ---------- write ----------
 keep <- intersect(c("CHROM","POS","REF","ALT","gene","zygosity","DP","AD","alt_frac","RED_FLAGS","CLNSIG","stars","CLNREVSTAT","CLNDN",
-                    "af","af_popmax","GNOMAD_NHOMALT","consequence","impact","priority","in_panel","FILTER"), names(t1))
+                    "af","af_popmax","GNOMAD_NHOMALT","consequence","impact","hgvsc","hgvsp","SIFT","PolyPhen","priority","in_panel","FILTER"), names(t1))
 fwrite(t1[, ..keep], file.path(out, "tier1_pathogenic_exomewide.tsv"), sep = "\t")
 keep2 <- intersect(c("CHROM","POS","REF","ALT","gene","zygosity","DP","AD","alt_frac","RED_FLAGS","CLNSIG","stars","af","af_popmax",
-                     "consequence","impact","FILTER"), names(t2))
+                     "consequence","impact","hgvsc","hgvsp","SIFT","PolyPhen","FILTER"), names(t2))
 fwrite(t2[, ..keep2], file.path(out, "tier2_panel_rare.tsv"), sep = "\t")
 fwrite(t3[, ..keep2], file.path(out, "tier3_panel_conflicting.tsv"), sep = "\t")
+if (has_vep) fwrite(t4[, intersect(keep2, names(t4)), with = FALSE], file.path(out, "tier4_lof_unclassified.tsv"), sep = "\t")
 
 fmt_row <- function(d) if (nrow(d) == 0) "_none_" else d[, paste0("- **", gene, "** ", CHROM, ":", POS, " ", REF, ">", ALT,
   " (", zygosity, ", depth ", DP, sprintf(", alt fraction %.2f", alt_frac),
   if ("RED_FLAGS" %in% names(d)) ifelse(is.na(RED_FLAGS), "", paste0(", Sema4 flags: ", RED_FLAGS)) else "",
   ") — ", CLNSIG, " [", stars, "★]",
-  ifelse(is.na(af_popmax), " gnomAD: n/a", sprintf(" gnomAD popmax AF %.2e", af_popmax)),
+  ifelse(is.na(af_popmax), " pop AF: n/a", sprintf(" max pop AF %.2e", af_popmax)),
   if ("consequence" %in% names(d)) paste0(" — ", consequence) else "",
+  if ("hgvsp" %in% names(d)) ifelse(is.na(hgvsp), ifelse(is.na(hgvsc), "", paste0(" ", hgvsc)), paste0(" ", hgvsp)) else "",
   ifelse(!is.na(CLNDN), paste0(" — ", substr(CLNDN, 1, 80)), ""))] |> paste(collapse = "\n")
 
 rep <- c(
@@ -111,13 +129,16 @@ rep <- c(
   sprintf("- Tier 1 (P/LP, ≥1 star, exome-wide): %d — HIGH: %d, MEDIUM: %d, LOW: %d",
           nrow(t1), sum(t1$priority == "HIGH"), sum(t1$priority == "MEDIUM"), sum(t1$priority == "LOW")),
   sprintf("- Tier 2 (rare, non-benign, in %d panel genes%s): %d", length(genes),
-          if (has_ann) ", protein-altering" else ", ALL consequences — no ANN field; run VEP/OpenCRAVAT to narrow", nrow(t2)),
+          if (has_csq) ", protein-altering" else ", ALL consequences — no ANN field; run VEP/OpenCRAVAT to narrow", nrow(t2)),
   sprintf("- Tier 3 (conflicting ClinVar, panel genes): %d", nrow(t3)),
   sprintf("- gnomAD frequencies available: %s", if (all(is.na(panel$af))) "NO (remote fetch failed; AF filters were skipped)" else "yes"), "",
   "## Tier 1 — HIGH / MEDIUM priority", fmt_row(t1[priority != "LOW"]), "",
   "## Tier 1 — LOW priority (carrier states, risk alleles, non-panel genes)", fmt_row(t1[priority == "LOW"]), "",
   "## Tier 2 — rare panel variants (candidates only)", fmt_row(t2[gene_panel == TRUE]), "",
   "## Tier 3 — conflicting classifications in panel genes", fmt_row(t3), "",
+  if (has_vep) c(sprintf("## Tier 4 — rare (AF<0.1%%) loss-of-function variants not classified in ClinVar, clean calls only: %d", nrow(t4)),
+                 "_Hypothesis-generating. A typical exome carries ~100 LoF variants; most are tolerated._",
+                 fmt_row(head(t4, 40)), "") else NULL,
   "## Key negatives (report explicitly — a clean result is a finding)",
   paste0("- Panel genes with NO P/LP and NO rare protein-altering variant: ",
          paste(setdiff(intersect(genes, genes_covered), unique(c(t1[in_panel == TRUE]$gene, t2[gene_panel == TRUE]$gene, t3$gene))), collapse = ", ")),

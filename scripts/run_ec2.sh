@@ -59,13 +59,19 @@ if [[ "$state" != "running" ]]; then
   echo ">> waiting for SSM agent"; sleep 60
 fi
 
+# ---- pause the idle auto-stop alarm for this run (downloads idle the CPU and would get the instance stopped) ----
+ALARM="esos-idle-stop-$IID"
+aws cloudwatch disable-alarm-actions --region "$REGION" --alarm-names "$ALARM"
+trap 'aws cloudwatch enable-alarm-actions --region "$REGION" --alarm-names "$ALARM" && echo ">> idle auto-stop alarm re-enabled"' EXIT
+echo ">> idle auto-stop alarm paused until this script exits"
+
 # ---- push scripts, launch ----
 aws s3 sync scripts/ "$BUCKET/proj/scripts/" --only-show-errors --exclude "*.log"
 CMD_ID=$(aws ssm send-command --region "$REGION" --instance-ids "$IID" \
   --document-name AWS-RunShellScript --timeout-seconds 7200 \
   --parameters "$(python3 -c 'import json,sys; print(json.dumps({"commands":[sys.stdin.read()],"executionTimeout":["7200"]}))' <<< "$REMOTE")" \
   --query 'Command.CommandId' --output text)
-echo ">> running on EC2 (command $CMD_ID) — this can take 10–30 min; safe to Ctrl-C, results still sync to S3"
+echo ">> running on EC2 (command $CMD_ID) — this can take 10–30 min; Ctrl-C re-arms the idle alarm; the remote job keeps running and still syncs to S3"
 
 # ---- poll ----
 while :; do

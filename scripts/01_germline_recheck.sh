@@ -176,6 +176,21 @@ fi
 (( GNOMAD_OK )) || cp "$OUT/germline.clinvar.vcf.gz" "$OUT/germline.annot.vcf.gz"
 tabix -f "$OUT/germline.annot.vcf.gz"
 
+# ---------- VEP: gene / consequence / HGVS / exome-wide AF (optional; install: run_ec2.sh 00) ----------
+VEP_ENV="${VEP_ENV:-/data/envs/vep}"; VEP_CACHE="${VEP_CACHE:-$REF/vep}"
+FINAL="$OUT/germline.annot.vcf.gz"; HAS_VEP=0
+if [[ -x "$VEP_ENV/bin/vep" && -f "$VEP_CACHE/.install_done" ]]; then
+  log "annotating consequences with VEP (--pick: one transcript per variant, canonical preferred)"
+  PATH="$VEP_ENV/bin:$PATH" vep -i "$OUT/germline.annot.vcf.gz" -o "$OUT/germline.vep.vcf.gz" \
+    --offline --cache --dir_cache "$VEP_CACHE" --assembly GRCh37 --vcf --compress_output bgzip \
+    --pick --symbol --canonical --hgvs --numbers --sift b --polyphen b --af_gnomade --max_af \
+    --fork "$(nproc)" --no_stats --force_overwrite
+  tabix -f "$OUT/germline.vep.vcf.gz"
+  FINAL="$OUT/germline.vep.vcf.gz"; HAS_VEP=1
+else
+  log "VEP not installed ($VEP_ENV) — skipping consequence annotation"
+fi
+
 # ---------- flat tables for R ----------
 FMT='%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t[%GT]\t[%DP]\t[%AD]\t%INFO/CLNSIG\t%INFO/CLNSIGCONF\t%INFO/CLNREVSTAT\t%INFO/CLNDN\t%INFO/GENEINFO\t%INFO/GNOMAD_AF\t%INFO/GNOMAD_AF_POPMAX\t%INFO/GNOMAD_NHOMALT'
 HDR='CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tGT\tDP\tAD\tCLNSIG\tCLNSIGCONF\tCLNREVSTAT\tCLNDN\tGENEINFO\tGNOMAD_AF\tGNOMAD_AF_POPMAX\tGNOMAD_NHOMALT'
@@ -184,11 +199,21 @@ if (( HAS_ANN )); then FMT="$FMT\t%INFO/ANN"; HDR="$HDR\tANN"; fi
 for tag in CALL_TYPE RED_FLAGS; do
   if bcftools view -h "$GVCF" | grep -q "^##INFO=<ID=$tag,"; then FMT="$FMT\t%INFO/$tag"; HDR="$HDR\t$tag"; fi
 done
+QUERY=(bcftools query)
+if (( HAS_VEP )); then   # +split-vep exposes CSQ subfields as %TAGs in the same query syntax
+  QUERY=(bcftools +split-vep)
+  for tag in SYMBOL Consequence IMPACT HGVSc HGVSp EXON SIFT PolyPhen gnomADe_AF MAX_AF; do FMT="$FMT\t%$tag"; HDR="$HDR\t$tag"; done
+fi
 
 # (a) every variant, genome-wide, that ClinVar knows anything about
-{ printf "$HDR\n"; bcftools query -i 'INFO/CLNSIG!=""' -f "$FMT\n" "$OUT/germline.annot.vcf.gz"; } > "$OUT/exome_clinvar_hits.tsv"
+{ printf "$HDR\n"; "${QUERY[@]}" -i 'INFO/CLNSIG!=""' -f "$FMT\n" "$FINAL"; } > "$OUT/exome_clinvar_hits.tsv"
 # (b) every variant inside the panel genes, ClinVar or not
-{ printf "$HDR\n"; bcftools query -R "$OUT/panel.bed" -f "$FMT\n" "$OUT/germline.annot.vcf.gz"; } > "$OUT/panel_all_variants.tsv"
+{ printf "$HDR\n"; "${QUERY[@]}" -R "$OUT/panel.bed" -f "$FMT\n" "$FINAL"; } > "$OUT/panel_all_variants.tsv"
+# (c) exome-wide rare protein-truncating / splice variants ClinVar has NOT classified (needs VEP)
+if (( HAS_VEP )); then
+  { printf "$HDR\n"; "${QUERY[@]}" -i 'INFO/CLNSIG="."' -f "$FMT\n" "$FINAL" | awk -F'\t' -v c="$(echo -e "$HDR" | tr '\t' '\n' | grep -n '^IMPACT$' | cut -d: -f1)" '$c=="HIGH"'; } > "$OUT/exome_lof_unclassified.tsv"
+  log "HIGH-impact variants not in ClinVar     : $(( $(wc -l < "$OUT/exome_lof_unclassified.tsv") - 1 ))"
+fi
 
 log "ClinVar-annotated variants (exome-wide): $(( $(wc -l < "$OUT/exome_clinvar_hits.tsv") - 1 ))"
 log "variants in panel genes               : $(( $(wc -l < "$OUT/panel_all_variants.tsv") - 1 ))"
