@@ -24,7 +24,7 @@ germline re-check changed anything.
 | 03 fusion review | Mac | not started (one FusionInspector call already judged artifact, see §2) | |
 | 04 copy number (FACETS) | EC2 + Mac | done 2026-09-22 | `results/04_copynumber/copynumber_report.md` |
 | 05 somatic re-annotation | EC2 + Mac | done 2026-09-22 (VEP + filter policy + CCF); signatures/GENIE comparison pending | `results/05_somatic/somatic_report.md` |
-| 06 immune / HLA | EC2 + Mac | HLA typing in progress; immune deconvolution not started | |
+| 06 immune / HLA | EC2 + Mac | HLA typing done 2026-09-22; immune deconvolution not started | `results/06_hla/hla_summary.tsv` |
 | 07 deposit + write-up | Mac | not started | |
 
 ---
@@ -46,7 +46,8 @@ germline re-check changed anything.
 - **Purity 0.57, ploidy 3.4, whole-genome doubled.** Identical at both cvals. `[solid]` for the qualitative call; purity ±0.05 plausible.
   - Sema4's 90% purity is wrong by a lot. All of Sema4's absolute copy numbers are superseded (diploid baseline + wrong purity).
 - **TP53: homozygous deletion of the entire gene** (all 11 exons at log2 ≈ −2.1; predicted for 0 tumor copies at purity 0.57 is ≤ −1.7). 46 kb focal deletion inside a 17p LOH block. `[solid]`
-- **RB1: intragenic homozygous deletion, exons 18–24**; exons 1–17 retained at 2 copies with LOH; exons 25–27 at 1 copy. Breakpoint in intron 17. `[solid]` from per-exon depth; junction sequence not yet recovered (would be PCR-validatable — see §4).
+- **RB1: intragenic homozygous deletion starting in intron 17**; exons 1–17 retained at 2 copies with LOH; exons 18–24 at 0 copies `[solid]`; exons 25–27 read ~1 copy on per-exon depth but FACETS calls 0 copies through 49.28 Mb — the three 3' exons are noisy (exon 27 is a 1.9 kb UTR), so "0 copies through exon 27" is `[likely]`.
+- **RB1 junction recovered at base-pair resolution (2026-09-22, `scripts/lib/rb1_breakpoint.sh`)**: chr13:48,986,411 (intron 17, hg19) joined to chr13:49,237,832 (~180 kb downstream of RB1's 3' end) in **inverted orientation**; 36 split reads, 94 discordant pairs, MAPQ ≥20. `[solid]` An inverted intrachromosomal junction (fold-back / BFB-type) rather than a simple deletion. Both retained copies carry it (region is LOH at 2 copies), so the event predates WGD. PCR-validatable; output in `results/04_copynumber/rb1_breakpoint.txt`.
 - Residual TP53/RB1 RNA (3.7 / 9.9 TPM) is fully explained by the 43% non-tumor cells; earlier suspicion of retained exons withdrawn.
 - **KDM3A focal amplification: 18 copies** (Sema4: ×8), 2p11.2, with 96th-percentile expression. `[solid]` amplitude approximate.
 - 17p11.2 (AURKB/COPS3) 7 copies + LOH, adjacent to the TP53 deletion — classic OS 17p pattern. 8q (MYC, PRKDC) 6 copies. `[likely]`
@@ -54,6 +55,10 @@ germline re-check changed anything.
 - Single-copy loss + LOH: PTEN, TSC2, CDKN1C. Copy-neutral LOH: ATRX, STK11, CHD5. 32% of autosomal genome is LOH. `[likely]`
 - **HRD scar score 75–81** (LOH 19–20, TAI 31–33, LST 25–28; array cutoff 42). `[weak]` — exome segments are coarser than arrays and WGD inflates LST/TAI; but the magnitude is large. BRCA1/2/PALB2 germline clean, so mechanism is open. Compare with Kovac 2015 (BRCAness in ~30% of OS).
 - HLA locus (6p21.3) segment: 3 total / 1 minor copy — **no HLA LOH** at segment resolution. `[likely]`; LOHHLA-style allele-specific check not done.
+
+### 06 HLA class I (2026-09-22) — OptiType 1.5 on normal DNA, tumor DNA, tumor RNA
+- Heterozygous at HLA-A, -B and -C; **identical 4-digit calls from all three samples**, and all six alleles are expressed in tumor RNA. Combined with the 3/1 FACETS state at 6p21: no HLA loss of any kind. `[solid]` Alleles are in `results/06_hla/hla_summary.tsv` (local only — germline-level information).
+- Immune deconvolution (quanTIseq / MCP-counter on genes.results) is the Mac part, not started.
 
 ### 05 Somatic (2026-09-22) — VEP 116 on Sema4's somatic.vcf, CCF vs FACETS
 - **Sema4's PASS set (1,177) is mostly rescued noise.** 1,018 carry `mutectFiltOverride` (Mutect2 filtered them; Sema4's pipeline overrode), 936 `lowAfT`; the flagged calls sit almost entirely below 5% AF and often come as adjacent clusters in one read family (four "ARID1A" calls at 2% AF within 3 codons; four "DICER1"; four "MXI1" frameshifts). `[solid]` These are not mutations. Sema4 reported none of them, so no harm done clinically, but anyone re-using the VCF must filter.
@@ -91,7 +96,7 @@ germline re-check changed anything.
 
 1. **FACETS solution.** Purity 0.57 / ploidy 3.4 with dipLogR −0.49. FACETS flags "mafR larger than expected if −0.34 is diploid level" — i.e. it considered and rejected a near-diploid solution. Please sanity-check the plots (`results/04_copynumber/facets_cval*.png`); an independent caller (Sequenza or ASCAT) would make this `[solid]`.
 2. **HRD score method.** Telli 2016 definitions re-implemented in `scripts/04_copynumber.R` on exome segments; not the scarHRD package. Check the TAI/LST implementations before quoting the number.
-3. **RB1 intron-17 breakpoint.** Worth recovering the junction from split reads (tumor BAM, chr13:48.95–48.99 Mb) → PCR-validatable, and it establishes the deletion as a single event.
+3. **RB1 junction** chr13:48,986,411 ↔ 49,237,832, inverted. Please check the read evidence (`rb1_breakpoint.txt`) and the interpretation (fold-back/BFB vs. a two-breakpoint complex event); the exon 25–27 copy state is the ambiguous part. A junction PCR would settle it.
 4. **Germline artifact triage** (local report): the calls I dismissed on alt-fraction/mapping grounds (PRSS1 ×2, SLC9B1, GSTT2) — agree?
 5. **Germline CNV screen** has no panel of normals; sensitivity for single-exon deletions is poor. POT1 ambiguity.
 6. **Somatic filter policy** (step 05, pending): Sema4's PASS set includes calls flagged `readsInN` / `lowAfT`. Decide which flags exclude.
@@ -126,7 +131,8 @@ germline re-check changed anything.
 | 09-22 | 01 (+VEP) | ~4 min | |
 | 09-22 | 04 | 13 min first pass (pileup 10 min); 2 short re-runs for normaliser bug | |
 | 09-22 | 05 | 1 min | VEP on 1,265 calls |
-| 09-22 | 06 | 3 failed starts (conda CLI differs from docs: `optitype run`, razers3 PATH) | |
+| 09-22 | 06 | 3 failed starts (conda CLI differs from docs: `optitype run`, razers3 PATH); then 22 min for 3 samples | |
+| 09-22 | 04b | 1 min | RB1 breakpoint split-read search |
 
 Cost model: instance ~$0.81/h; the 1 TB gp3 volume ~$93/month whether running or not. Plan: finish EC2 batch (05 VEP, 06 HLA), then snapshot/shrink the volume.
 
