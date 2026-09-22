@@ -114,6 +114,11 @@ germline re-check changed anything.
 
 ---
 
+### External audit of manuscript v0.1 (2026-09-22) — `manuscript/audit_response_v0.1.md`
+- 26-point audit; all its 22 citations verified against PubMed. Accepted essentially all of it; v0.2 written. Analyses added in response: **ASCAT second caller** (04c), **transcriptome robustness** (02c: no-mapping sensitivity, reference-only classifiers with LOO-CV, gene bootstrap, site/age controls, full HOX-cluster table), **RB1 RNA junction analysis** (SJ.out.tab), MAP4K4 transcript reconciliation from the delivered VCF.
+- Findings that changed: RB1 p.Thr502Ile downgraded to VUS (gnomAD 1.9e-4, SIFT tolerated; not an inactivating event); "kataegis" → "APOBEC-like localized cluster"; HOX finding is **HOXA-cluster-wide** (+ HOXC9–11), HOXD10/11 elevated, holds vs retroperitoneal STS; CD276 is *below* the OS median (earlier "96th percentile" was within-sample rank); Kovac BRCAness fraction is >80%, not one-third; HRD not "positive", provisional scar burden; HLA "intact antigen presentation" withdrawn (TAP1 below OS median).
+- ASCAT vs FACETS: purity 0.67/0.57, ploidy 2.75/3.42, WGD yes/yes, LOH 27%/32%, gene states 9/11 concordant. Reported as ranges. Claim A in REVIEW.md upgraded from "wants a 2nd caller" to "two callers agree qualitatively; third to break the ploidy tie".
+
 ## 3. Corrections to earlier statements (kept on purpose)
 
 | Date | Said | Corrected to | Why |
@@ -122,6 +127,13 @@ germline re-check changed anything.
 | 09-21 | "Genome probably doubled; purity may be 55–67%" | WGD confirmed; purity 0.57 | FACETS |
 | 09-21 | TP53/RB1 "homozygous deletion unproven, may be partial/subclonal" | Both are clonal homozygous deletions | Log-ratio matches 0 copies at purity 0.57 |
 | 09-21 | Residual TP53/RB1 expression "suggests retained exons" | Explained by normal-cell contamination | purity 0.57 |
+| 09-22 | RB1 T502I "on both retained copies", one of three inactivating events | Clonal somatic VUS; multiplicity 1.5–1.8 depending on purity; RB1 inactivation rests on the deletion | Audit item 7; ASCAT purity |
+| 09-22 | MAP4K4 "kataegis" | "APOBEC-like localized cluster" (4 events do not meet intermutation-distance definitions) | Audit item 11 |
+| 09-22 | "Lacks the limb HOX code" / posterior HOX | HOXA-cluster-wide reduction (+HOXC9–11), HOXD10/11 elevated; not a site effect; hypothesis-grade | 02c site-stratified analysis |
+| 09-22 | Kovac 2015: BRCAness in "about a third" of OS | >80% (abstract) | Audit item 22 |
+| 09-22 | CD276/B7-H3 "96th percentile" | Within-sample rank only; vs TARGET-OS it is at the 19th percentile | 02 GDC z-scores |
+| 09-22 | "Antigen presentation intact" | "No HLA class I allele loss detected"; TAP1 below OS median | Audit item 18 |
+| 09-22 | "All of Sema4's absolute copy numbers were wrong" | Copy numbers were expressed relative to a diploid reference and flagged approximate by the vendor; allele-specific re-analysis revised them | Audit item 26 |
 | 09-22 | "T-cell-poor" microenvironment (from raw CD8A/CD3E TPM) | Immune-infiltrated for OS, myeloid-dominated; CD8 at OS median, CD4-type T cells present | Deconvolution vs cohorts (06) |
 | 09-22 | HMGA2 / VEGFA / BGLAP / CDK4 z-scores vs OS | Withdrawn — pipeline artifacts (moved > 1 SD on like-for-like quantification) | 02b |
 | 09-22 | Exon-level log2 values in first step-04 run | Values were self-normalised (mosdepth `total_region` covers only the --by BED); fixed to genome-wide exon mean | Bug, see §5 |
@@ -175,6 +187,7 @@ germline re-check changed anything.
 | 09-22 | 04b | 1 min | RB1 breakpoint split-read search |
 | 09-22 | 02b | 1 h 45 min | genome download slow (EBI FTP), index 30 min, STAR 2-pass 71 min |
 | 09-22 | 03b | 1 min | exome DNA check of RNA chimeras — inconclusive |
+| 09-22 | 02c, 04c (Mac) | ~10 min each | audit-response analyses |
 | 09-22 | snapshots | — | snap-0956920fd9e1d9979 (root 100 GB), snap-0f1d1d38aa7663a77 (data 1 TB) taken after the batch; instance stopped, volumes kept |
 
 Cost model: instance ~$0.81/h; the 1 TB gp3 volume ~$93/month whether running or not. Plan: finish EC2 batch (05 VEP, 06 HLA), then snapshot/shrink the volume.

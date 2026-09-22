@@ -20,16 +20,18 @@ clinical report miss or not attempt, and which findings are worth depositing and
 
 | # | Claim | Our confidence | Where |
 |---|---|---|---|
-| A | Purity 0.57, ploidy 3.4, whole-genome doubled (FACETS; Sema4 assumed 90% purity, diploid) | solid (one caller, two cvals agree) — **wants a 2nd caller** | `results/04_copynumber/` |
-| B | TP53: whole-gene homozygous deletion. RB1: somatic p.Thr502Ile on both retained copies + copy-neutral LOH of exons 1–17 + homozygous deletion from intron 17 (junction chr13:48,986,411 ↔ 49,237,832, inverted, 36 split / 94 discordant reads) | solid | `04`, `05`, `rb1_breakpoint.txt` |
-| C | Transcriptome clusters with bone OS (TARGET-OS, n=88), not with any TCGA-SARC subtype (n=259), on a like-for-like STAR/GENCODE v36 quantification | solid | `results/02_expression/gdc_requant/` |
+| A | Purity 0.57–0.67, ploidy 2.8–3.4, whole-genome doubled (FACETS + ASCAT on the same allele counts; requisition cellularity was 90%) | solid qualitatively (two callers agree on WGD, LOH, 9/11 gene states; differ along the purity–ploidy trade-off) — **third caller wanted** | `results/04_copynumber/`, `ascat_report.md` |
+| B | TP53: whole-gene homozygous deletion. RB1: copy-neutral LOH of exons 1–17 + homozygous deletion from intron 17 (junction chr13:48,986,411 ↔ 49,237,832, inverted, 36 split / 94 discordant reads); RNA junction reads confirm the 5'/3' contrast. Plus a clonal somatic p.Thr502Ile VUS (multiplicity 1.5–1.8) | solid (structure) / VUS (missense) | `04`, `05`, `rb1_breakpoint.txt` |
+| C | Transcriptome classified as bone OS (TARGET-OS, n=88) vs any TCGA-SARC subtype (n=259), like-for-like quantification; robust to normalization, gene selection (100% of 500 bootstraps), classifier (LOO-CV 99%), and age/site confounds | solid | `results/02_expression/gdc_requant/robustness_report.md` |
 | D | 18-copy 2p11.2 amplicon (~5 Mb, hg19 chr2:83.08–88.13 Mb) containing KDM3A, transcribed across its span; two RNA chimeras coincide with its DNA boundaries | likely | `04`, `02 gdc`, `03` |
 | E | MAP4K4: four clonal strand-coordinated C>T/C>G SNVs in 1.3 kb (3/4 TpC), on ~3 of 5 copies (pre-WGD), adjacent (~10–15 kb) to an RNA-evidenced breakpoint (MAP4K4–SLC9A2, 173 STAR split reads at one acceptor). Interpreted as APOBEC kataegis at a rearrangement, not four drivers. Sema4 reported one as a VUS | likely | `05`, `03` |
 | F | HRD scar score 75–81 (Telli definitions on exome segments) with clean HR genes germline and somatic | weak — **method needs your check** | `04` |
 | G | Microenvironment: myeloid/macrophage-dominated (MCP-counter monocytic score above all 88 TARGET-OS), CD8 at OS median, PD-L1 low; HLA class I heterozygous, all alleles expressed, no HLA LOH | likely | `06` |
-| H | No limb HOX code (HOXA9/10/11, HOXC10, PITX1 near zero vs TARGET-OS). Retroperitoneal site is lumbar-level where HOX10 paralogs are normally expressed, so this may reflect cell of origin | weak — needs the right control | `02 gdc` |
+| H | HOXA-cluster-wide reduction (+HOXC9–11; HOXD10/11 elevated) vs both TARGET-OS and retroperitoneal TCGA-SARC — not a site effect; interpretation (cell of origin / cluster silencing) is hypothesis-grade | likely (observation) / weak (interpretation) | `robustness_report.md` §5–6 |
 | I | Germline: no P/LP variant in 51 predisposition genes (ACMG + sarcoma genes), no germline exon/gene deletion in TP53/RB1 (coarse screen); one incidental carrier-type variant outside the panel | solid / coarse | local only, see §5 |
 | J | Sema4's somatic VCF `PASS` set (1,177) is ~90% Mutect2-rescued noise (<5% AF read clusters); 87 calls survive an explicit policy; TMB 1.8/Mb by that policy | solid | `05` |
+
+**Update 2026-09-22:** an external audit of manuscript v0.1 has already been received and answered (`manuscript/audit_response_v0.1.md`); items 1, 10 and 11b below have been substantially addressed (ASCAT; robustness analyses). The remaining highest-value checks are the HRD implementation (2), the RB1/MAP4K4 interpretations (3, 7, 8) and a third CN caller.
 
 ## 3. Specific items to check (numbered as in NOTEBOOK §4)
 
